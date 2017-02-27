@@ -1,5 +1,7 @@
 package gumtree.spoon;
 
+import java.io.File;
+
 import gumtree.spoon.builder.SpoonGumTreeBuilder;
 import gumtree.spoon.diff.Diff;
 import gumtree.spoon.diff.DiffImpl;
@@ -13,8 +15,6 @@ import spoon.support.DefaultCoreFactory;
 import spoon.support.StandardEnvironment;
 import spoon.support.compiler.VirtualFile;
 import spoon.support.compiler.jdt.JDTBasedSpoonCompiler;
-
-import java.io.File;
 
 /**
  * Computes the differences between two CtElements.
@@ -60,26 +60,24 @@ public class AstComparator {
 		factory.getEnvironment().setNoClasspath(true);
 	}
 
-	/**
-	 * compares two java files
-	 */
-	public Diff compare(File f1, File f2) throws Exception {
-		return this.compare(getCtType(f1), getCtType(f2));
+	public Diff compare(File f1, File f2, String Extracted_Mtd, String Src_Mtd) throws Exception {
+		return this.compare(getCtType(f1), getCtType(f2), Extracted_Mtd, Src_Mtd);
 	}
 
 	/**
 	 * compares two snippet
 	 */
-	public Diff compare(String left, String right) {
-		return compare(getCtType(left), getCtType(right));
+	public Diff compare(String left, String right, String Extracted_Mtd, String Src_Mtd) {
+		return compare(getCtType(left), getCtType(right), Extracted_Mtd, Src_Mtd);
 	}
 
 	/**
 	 * compares two AST nodes
 	 */
-	public Diff compare(CtElement left, CtElement right) {
+	public Diff compare(CtElement left, CtElement right, String Extracted_Mtd, String Src_Mtd) {
 		final SpoonGumTreeBuilder scanner = new SpoonGumTreeBuilder();
-		return new DiffImpl(scanner.getTreeContext(), scanner.getTree(left), scanner.getTree(right));
+		return new DiffImpl(scanner.getTreeContext(), scanner.getTree(left), scanner.getTree(right),
+				Extracted_Mtd, Src_Mtd);
 	}
 
 	private CtType getCtType(File file) throws Exception {
@@ -103,12 +101,14 @@ public class AstComparator {
 	}
 
 	public static void main(String[] args) throws Exception {
-		if (args.length != 2) {
-			System.out.println("Usage: DiffSpoon <file_1>  <file_2>");
+		if (args.length != 4) {
+			System.out.println(args.length);
+			System.out.println("Usage: DiffSpoon <file_1>  <file_2> <Extracted_Mtd_Name> <Src_Mtd_Name>");
 			return;
 		}
 
-		final Diff result = new AstComparator().compare(new File(args[0]), new File(args[1]));
+		final Diff result = new AstComparator().compare(new File(args[0]), new File(args[1]), args[2],
+				args[3]);
 		System.out.println(result.toString());
 	}
 }
