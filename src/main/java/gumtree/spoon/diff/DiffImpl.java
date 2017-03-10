@@ -10,10 +10,12 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import spoon.reflect.factory.Factory;
+import spoon.reflect.factory.FactoryImpl;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-
+// import org.apache.log4j.Level;
 import com.github.gumtreediff.actions.ActionGenerator;
 import com.github.gumtreediff.actions.model.Action;
 import com.github.gumtreediff.actions.model.Delete;
@@ -33,26 +35,23 @@ import gumtree.spoon.diff.operations.MoveOperation;
 import gumtree.spoon.diff.operations.Operation;
 import gumtree.spoon.diff.operations.OperationKind;
 import gumtree.spoon.diff.operations.UpdateOperation;
-import spoon.reflect.code.CtArrayAccess;
 import spoon.reflect.code.CtAssert;
 import spoon.reflect.code.CtAssignment;
 import spoon.reflect.code.CtBlock;
+import spoon.reflect.code.CtCodeSnippetStatement;
 import spoon.reflect.code.CtComment;
 import spoon.reflect.code.CtConditional;
 import spoon.reflect.code.CtExecutableReferenceExpression;
 import spoon.reflect.code.CtFieldAccess;
-import spoon.reflect.code.CtFor;
 import spoon.reflect.code.CtIf;
 import spoon.reflect.code.CtInvocation;
 import spoon.reflect.code.CtLiteral;
 import spoon.reflect.code.CtLocalVariable;
-import spoon.reflect.code.CtLoop;
 import spoon.reflect.code.CtStatement;
 // import spoon.reflect.code.CtStatement;
 import spoon.reflect.code.CtSwitch;
 import spoon.reflect.code.CtTypeAccess;
 import spoon.reflect.code.CtVariableAccess;
-import spoon.reflect.code.CtWhile;
 import spoon.reflect.declaration.CtClass;
 import spoon.reflect.declaration.CtConstructor;
 import spoon.reflect.declaration.CtElement;
@@ -65,7 +64,10 @@ import spoon.reflect.declaration.CtType;
 import spoon.reflect.declaration.CtTypedElement;
 import spoon.reflect.declaration.CtVariable;
 import spoon.reflect.visitor.filter.TypeFilter;
+import spoon.support.DefaultCoreFactory;
+import spoon.support.StandardEnvironment;
 import spoon.support.reflect.reference.CtPackageReferenceImpl;
+// import spoon.reflect.factory.CodeFactory;;;
 
 /**
  * @author Matias Martinez, matias.martinez@inria.fr
@@ -194,12 +196,11 @@ public class DiffImpl implements Diff {
 	private int Num_Assert;
 	private int Num_Assign;
 
-	public DiffImpl(TreeContext context, ITree rootSpoonLeft, ITree rootSpoonRight,
-			String Extracted_Mtd, String Src_Mtd) {
+	public DiffImpl(TreeContext context, ITree rootSpoonLeft, ITree rootSpoonRight, String Extracted_Mtd,
+			String Src_Mtd) {
 		final MappingStore mappingsComp = new MappingStore();
 
-		final Matcher matcher = new CompositeMatchers.ClassicGumtree(rootSpoonLeft, rootSpoonRight,
-				mappingsComp);
+		final Matcher matcher = new CompositeMatchers.ClassicGumtree(rootSpoonLeft, rootSpoonRight, mappingsComp);
 		matcher.match();
 
 		final ActionGenerator actionGenerator = new ActionGenerator(rootSpoonLeft, rootSpoonRight,
@@ -208,8 +209,8 @@ public class DiffImpl implements Diff {
 
 		final ActionClassifier actionClassifier = new ActionClassifier();
 		this.allOperations = convertToSpoon(actionGenerator.getActions());
-		this.rootOperations = convertToSpoon(actionClassifier
-				.getRootActions(matcher.getMappingSet(), actionGenerator.getActions()));
+		this.rootOperations = convertToSpoon(
+				actionClassifier.getRootActions(matcher.getMappingSet(), actionGenerator.getActions()));
 		this._mappingsComp = mappingsComp;
 		this.context = context;
 		this.Name_Ext_Mtd = Extracted_Mtd;
@@ -227,8 +228,7 @@ public class DiffImpl implements Diff {
 			} else if (action instanceof Move) {
 				return new MoveOperation((Move) action);
 			} else {
-				throw new IllegalArgumentException(
-						"Please support the new type " + action.getClass());
+				throw new IllegalArgumentException("Please support the new type " + action.getClass());
 			}
 		}).collect(Collectors.toList());
 	}
@@ -244,8 +244,7 @@ public class DiffImpl implements Diff {
 	}
 
 	@Override
-	public List<Operation> getOperationChildren(Operation operationParent,
-			List<Operation> rootOperations) {
+	public List<Operation> getOperationChildren(Operation operationParent, List<Operation> rootOperations) {
 		return rootOperations.stream() //
 				.filter(operation -> operation.getNode().getParent().equals(operationParent)) //
 				.collect(Collectors.toList());
@@ -307,8 +306,7 @@ public class DiffImpl implements Diff {
 	@Override
 	public boolean containsOperation(OperationKind kind, String nodeKind) {
 		return rootOperations.stream() //
-				.anyMatch(operation -> operation.getAction().getClass().getSimpleName()
-						.equals(kind.name()) //
+				.anyMatch(operation -> operation.getAction().getClass().getSimpleName().equals(kind.name()) //
 						&& context.getTypeLabel(operation.getAction().getNode()).equals(nodeKind));
 	}
 
@@ -318,10 +316,10 @@ public class DiffImpl implements Diff {
 	}
 
 	@Override
-	public boolean containsOperations(List<Operation> operations, OperationKind kind,
-			String nodeKind, String nodeLabel) {
-		return operations.stream().anyMatch(
-				operation -> operation.getAction().getClass().getSimpleName().equals(kind.name()) //
+	public boolean containsOperations(List<Operation> operations, OperationKind kind, String nodeKind,
+			String nodeLabel) {
+		return operations.stream()
+				.anyMatch(operation -> operation.getAction().getClass().getSimpleName().equals(kind.name()) //
 						&& context.getTypeLabel(operation.getAction().getNode()).equals(nodeKind) //
 						&& operation.getAction().getNode().getLabel().equals(nodeLabel));
 	}
@@ -345,9 +343,8 @@ public class DiffImpl implements Diff {
 				nodeType = nodeElement.getClass().getSimpleName();
 				nodeType = nodeType.substring(2, nodeType.length() - 4);
 			}
-			result += "\"" + operation.getAction().getClass().getSimpleName() + "\", \"" + nodeType
-					+ "\", " + label + " (size: " + node.getDescendants().size() + ")"
-					+ node.toTreeString();
+			result += "\"" + operation.getAction().getClass().getSimpleName() + "\", \"" + nodeType + "\", " + label
+					+ " (size: " + node.getDescendants().size() + ")" + node.toTreeString();
 		}
 		System.out.println(result);
 		return result;
@@ -371,8 +368,7 @@ public class DiffImpl implements Diff {
 		FileWriter fileWriter = new FileWriter(file_after);
 		fileWriter.write("------------------Extracted method---------------------" + "\n" + "\n"
 				+ extracted_Method.toString() + "\n" + "\n"
-				+ "-------------------Methods who call it--------------------" + callMethod.size()
-				+ "\n" + "\n");
+				+ "-------------------Methods who call it--------------------" + callMethod.size() + "\n" + "\n");
 		callMethod = getNewList(callMethod); // 去重
 		int size = callMethod.size();
 		System.out.println("--------------call method----------------" + callMethod.size());
@@ -393,14 +389,12 @@ public class DiffImpl implements Diff {
 		for (t = 0; t < size3; t++) {
 			tempEl = deleteStuff.get(t);
 			sim2 = sim(tempEl.toString(), extracted_Method.getBody().toString());
-			System.out.println("the code is: " + tempEl.toString()
-					+ "the similarity of this stuff is: " + sim2);
+			System.out.println("the code is: " + tempEl.toString() + "the similarity of this stuff is: " + sim2);
 			if (sim2 > sim1) {
 				deleted = tempEl;
 				sim1 = sim2;
 			}
 		}
-		//System.out.println("000000000000000" + sim(deleted.toString(), extracted_Method.getBody().toString()));
 		if (size3 == 0 || sim(deleted.toString(), extracted_Method.getBody().toString()) < 0.6) {
 			deleted = extracted_Method.getBody();
 			System.out.println("use extracted method directly");
@@ -410,15 +404,13 @@ public class DiffImpl implements Diff {
 		FileWriter fileWriter2 = new FileWriter(file_before);
 		fileWriter2.write("-----------------------Extracted Part---------------------" + "\n" + "\n"
 				+ deleted.toString() + "\n" + "\n");
-		fileWriter2.write("--------------------------Source Methods------------------------------"
-				+ "\n" + "\n");
+		fileWriter2.write("--------------------------Source Methods------------------------------" + "\n" + "\n");
 		sourceMethod = getNewList(sourceMethod); // 去重
 		int size = sourceMethod.size();
 		for (int i = 0; i < size; i++) {
 			fileWriter2.write(sourceMethod.get(i).toString() + "\n" + "\n");
 		}
-		fileWriter2
-				.write("--------------------------end-----------------------------" + "\n" + "\n");
+		fileWriter2.write("--------------------------end-----------------------------" + "\n" + "\n");
 		fileWriter2.close();
 	}
 
@@ -518,29 +510,23 @@ public class DiffImpl implements Diff {
 		// File file = new File("file.csv");
 		CSVFormat format = null;
 		if (file.exists()) {
-			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal",
-					"Src_Num_Invocation", "Src_Num_Loop", "Src_Num_While", "Src_Num_For",
-					"Src_Num_If", "Src_Num_Conditional", "Src_Num_Switch", "Src_Num_Var_Ac",
-					"Src_Num_Field_Ac", "Src_Num_Arr_Ac", "Src_Num_Assert", "Src_Num_Assign",
-					"LOC_Extracted_Method", "Num_local", "Num_Literal", "Num_Invocation",
-					"Num_Loop", "Num_While", "Num_For", "Num_If", "Num_Conditional", "Num_Switch",
-					"Num_Var_Ac", "Num_Field_Ac", "Num_Arr_Ac", "Num_Assert", "Num_Assign",
-					"Ratio_Variable_Access", "Ratio_Field_Access", "Ratio_Invocation",
-					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Modifiable", "Ratio_Package")
-					.withSkipHeaderRecord();
+			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal", "Src_Num_Invocation",
+					"Src_Num_If", "Src_Num_Conditional", "Src_Num_Switch", "Src_Num_Var_Ac", "Src_Num_Type_Ac",
+					"Src_Num_Field_Ac", "Src_Num_Assert", "Src_Num_Assign", "Src_Num_Typed_Ele", "Src_Num_Package",
+					"LOC_Extracted_Method", "Num_Variable", "Num_local", "Num_Literal", "Num_Invocation", "Num_If",
+					"Num_Conditional", "Num_Switch", "Num_Var_Ac", "Num_Type_Ac", "Num_Field_Ac", "Num_Assign",
+					"Num_Typed_Ele", "Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Field_Access",
+					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Package").withSkipHeaderRecord();
 		} else {
-			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal",
-					"Src_Num_Invocation", "Src_Num_Loop", "Src_Num_While", "Src_Num_For",
-					"Src_Num_If", "Src_Num_Conditional", "Src_Num_Switch", "Src_Num_Var_Ac",
-					"Src_Num_Field_Ac", "Src_Num_Arr_Ac", "Src_Num_Assert", "Src_Num_Assign",
-					"LOC_Extracted_Method", "Num_local", "Num_Literal", "Num_Invocation",
-					"Num_Loop", "Num_While", "Num_For", "Num_If", "Num_Conditional", "Num_Switch",
-					"Num_Var_Ac", "Num_Field_Ac", "Num_Arr_Ac", "Num_Assert", "Num_Assign",
-					"Ratio_Variable_Access", "Ratio_Field_Access", "Ratio_Invocation",
-					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Modifiable", "Ratio_Package");
+			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal", "Src_Num_Invocation",
+					"Src_Num_If", "Src_Num_Conditional", "Src_Num_Switch", "Src_Num_Var_Ac", "Src_Num_Type_Ac",
+					"Src_Num_Field_Ac", "Src_Num_Assert", "Src_Num_Assign", "Src_Num_Typed_Ele", "Src_Num_Package",
+					"LOC_Extracted_Method", "Num_Variable", "Num_local", "Num_Literal", "Num_Invocation", "Num_If",
+					"Num_Conditional", "Num_Switch", "Num_Var_Ac", "Num_Type_Ac", "Num_Field_Ac", "Num_Assign",
+					"Num_Typed_Ele", "Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Field_Access",
+					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Package");
 		}
-		try (Writer out = new FileWriter("file.csv", true);
-				CSVPrinter printer = new CSVPrinter(out, format)) {
+		try (Writer out = new FileWriter("file.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
 			System.out.println("--------------source method----------------" + sourceMethod.size());
 			for (int w = 0; w < sourceMethod.size(); w++) {
 				// get the body of source method: blk
@@ -553,169 +539,124 @@ public class DiffImpl implements Diff {
 					blk = constr.getBody();
 				}
 				// get the body of Call Method(the after version of source method) : blk2
-				CtBlock blk2 = null;
-				if (callMethod.get(0) instanceof CtMethod) {
-					CtMethod srcMe = (CtMethod) callMethod.get(0);
-					blk2 = srcMe.getBody();
-				} else if (callMethod.get(0) instanceof CtConstructor) {
-					CtConstructor srcCon = (CtConstructor) callMethod.get(0);
-					blk2 = srcCon.getBody();
+				// get the src
+				// F1 metrics (src)
+				CtBlock cblk = blk.clone();
+				for (int y = 0; y < cblk.getStatements().size(); y++) {
+					cblk.removeStatement(cblk.getStatement(y));
+					y--;
 				}
-
-				// get the context
-				// int size_call = blk2.getStatements().size();
-				for (int n = 0; n < blk2.getStatements().size(); n++) {
-					//System.out.println("size: " + size_call);
-					//System.out.println("n: " + n);
-					CtStatement temp_s = blk2.getStatement(n);
-					if (temp_s.toString().contains(Name_Ext_Mtd)) {
-						blk2.removeStatement(temp_s);
-						//System.out.println("remove: " + temp_s);
-						n--;
-					}
+				List<CtStatement> srcStat = new ArrayList<CtStatement>();
+				srcStat = blk.getElements(new TypeFilter(CtStatement.class));
+				for (int q = 0; q < srcStat.size(); q++) {
+					System.out.println("Statements" + (q + 1) + ": " + srcStat.get(q));
 				}
-				System.out.println("hellllllo" + blk2);
-				// F1 metrics (context)
-				int Src_LOC = blk2.getStatements().size();
-				int Src_Num_Variable = blk2.getElements(new TypeFilter(CtVariable.class)).size();
-				int Src_Num_local = blk2.getElements(new TypeFilter(CtLocalVariable.class)).size();
-				int Src_Num_Literal = blk2.getElements(new TypeFilter(CtLiteral.class)).size();
-				int Src_Num_Assert = blk2.getElements(new TypeFilter(CtAssert.class)).size();
-				int Src_Num_Com = blk2.getElements(new TypeFilter(CtComment.class)).size();
-				//int Src_Num_Annotation = m.getBody().getElements(new TypeFilter(CtAnnotation.class)).size();
-				int Src_Num_Invocation = blk2.getElements(new TypeFilter(CtInvocation.class))
-						.size();
-				int Src_Num_Executable = blk2.getElements(new TypeFilter(CtExecutable.class))
-						.size();
-				int Src_Num_ExeRefExp = blk2
-						.getElements(new TypeFilter(CtExecutableReferenceExpression.class)).size();
-				int Src_Num_Loop = blk2.getElements(new TypeFilter(CtLoop.class)).size();
-				int Src_Num_While = blk2.getElements(new TypeFilter(CtWhile.class)).size();
-				int Src_Num_For = blk2.getElements(new TypeFilter(CtFor.class)).size();
-				int Src_Num_If = blk2.getElements(new TypeFilter(CtIf.class)).size();
-				int Src_Num_Conditional = blk2.getElements(new TypeFilter(CtConditional.class))
-						.size();
-				int Src_Num_Switch = blk2.getElements(new TypeFilter(CtSwitch.class)).size();
-				int Src_Num_Var_Ac = blk2.getElements(new TypeFilter(CtVariableAccess.class))
-						.size();
-				int Src_Num_Type_Ac = blk2.getElements(new TypeFilter(CtTypeAccess.class)).size();
-				int Src_Num_Field_Ac = blk2.getElements(new TypeFilter(CtFieldAccess.class)).size();
-				int Src_Num_Arr_Ac = blk2.getElements(new TypeFilter(CtArrayAccess.class)).size();
-				int Src_Num_Assign = blk2.getElements(new TypeFilter(CtAssignment.class)).size();
-
+				System.out.println("------------------------------");
+				CtStatement chozen = ((CtStatement) blk.getElements(new TypeFilter(CtStatement.class)).get(3));
+				CtIf tIf = (CtIf) chozen;
+				System.out.println("if statement: " + tIf.toString());
+				System.out.println("then statement: " + tIf.getThenStatement());
+				Factory factory = new FactoryImpl(new DefaultCoreFactory(), new StandardEnvironment());
+				CtCodeSnippetStatement statementInConstructor = factory.Code().createCodeSnippetStatement(tIf.getThenStatement().toString());
+				List<CtStatement> list = factory.Code().createStatementList(tIf.getThenStatement()).getStatements();
+				System.out.println("statementInConstructor: " + list.size());
+				CtBlock CtBlockOfConstructor = factory.Code().createCtBlock(statementInConstructor);
+				System.out.println("CtBlockOfConstructor" + CtBlockOfConstructor.getStatements().size());
+				System.out.println("else statement: " + tIf.getElseStatement());
+				System.out.println("deletedStatements: " + chozen);
+				cblk.addStatement(chozen);
+				System.out.println("the body of negative sample:" + cblk.toString());
+				System.out.println("LOC of negative sample:" + cblk.getStatements().size());
+				System.out.println("LOC of src:" + blk.getStatements());
+				int Src_LOC = blk.getStatements().size();
+				System.out.println("LOC of src:" + Src_LOC);
+				int Src_Num_local = blk.getElements(new TypeFilter(CtLocalVariable.class)).size();
+				int Src_Num_Literal = blk.getElements(new TypeFilter(CtLiteral.class)).size();
+				int Src_Num_Assert = blk.getElements(new TypeFilter(CtAssert.class)).size();
+				int Src_Num_Com = blk.getElements(new TypeFilter(CtComment.class)).size();
+				// int Src_Num_Annotation = m.getBody().getElements(new TypeFilter(CtAnnotation.class)).size();
+				int Src_Num_Invocation = blk.getElements(new TypeFilter(CtInvocation.class)).size();
+				int Src_Num_Executable = blk.getElements(new TypeFilter(CtExecutable.class)).size();
+				int Src_Num_ExeRefExp = blk.getElements(new TypeFilter(CtExecutableReferenceExpression.class)).size();
+				int Src_Num_If = blk.getElements(new TypeFilter(CtIf.class)).size();
+				int Src_Num_Conditional = blk.getElements(new TypeFilter(CtConditional.class)).size();
+				int Src_Num_Switch = blk.getElements(new TypeFilter(CtSwitch.class)).size();
+				int Src_Num_Var_Ac = blk.getElements(new TypeFilter(CtVariableAccess.class)).size();
+				int Src_Num_Type_Ac = blk.getElements(new TypeFilter(CtTypeAccess.class)).size();
+				int Src_Num_Field_Ac = blk.getElements(new TypeFilter(CtFieldAccess.class)).size();
+				int Src_Num_Assign = blk.getElements(new TypeFilter(CtAssignment.class)).size();
+				double ratio_LOC = 0;
 				// F2 metrics
 				LOC_Extracted_Method = extracted_Method.getBody().getStatements().size();
-
+				if (Src_LOC > 0) {
+					ratio_LOC = LOC_Extracted_Method / (double) Src_LOC;
+				}
 				// variable
 				Num_Variable = deleted.getElements(new TypeFilter(CtVariable.class)).size();
 				Num_local = deleted.getElements(new TypeFilter(CtLocalVariable.class)).size();
-
 				// Literal
 				Num_Literal = deleted.getElements(new TypeFilter(CtLiteral.class)).size();
-
-				// Comments & Annotation
-				Num_Com = deleted.getElements(new TypeFilter(CtComment.class)).size();
-				//Num_Annotation = deleted.getElements(new TypeFilter(CtAnnotation.class)).size();
-				//Num_AnnotationType = deleted.getElements(new TypeFilter(CtAnnotationType.class)).size();
-
 				// Invocation
 				Num_Invocation = deleted.getElements(new TypeFilter(CtInvocation.class)).size();
-				Num_Executable = deleted.getElements(new TypeFilter(CtExecutable.class)).size();
-				Num_ExeRefExp = deleted
-						.getElements(new TypeFilter(CtExecutableReferenceExpression.class)).size();
-
 				// Structure
-				Num_Loop = deleted.getElements(new TypeFilter(CtLoop.class)).size();
-				Num_While = deleted.getElements(new TypeFilter(CtWhile.class)).size();
-				Num_For = deleted.getElements(new TypeFilter(CtFor.class)).size();
 				Num_If = deleted.getElements(new TypeFilter(CtIf.class)).size();
 				Num_Conditional = deleted.getElements(new TypeFilter(CtConditional.class)).size();
 				Num_Switch = deleted.getElements(new TypeFilter(CtSwitch.class)).size();
-
 				// Access
 				Num_Var_Ac = deleted.getElements(new TypeFilter(CtVariableAccess.class)).size();
 				Num_Type_Ac = deleted.getElements(new TypeFilter(CtTypeAccess.class)).size();
 				Num_Field_Ac = deleted.getElements(new TypeFilter(CtFieldAccess.class)).size();
-				Num_Arr_Ac = deleted.getElements(new TypeFilter(CtArrayAccess.class)).size();
-				Num_Assert = deleted.getElements(new TypeFilter(CtAssert.class)).size();
 				Num_Assign = deleted.getElements(new TypeFilter(CtAssignment.class)).size();
-
-				// F3 the ratio of frequency of variable used in the deleted part to used in src
-				deletedVariable = new ArrayList<CtVariable>(
-						deleted.getElements(new TypeFilter(CtVariable.class)));
-				srcVariable = new ArrayList<CtVariable>(
-						blk.getElements(new TypeFilter(CtVariable.class)));
-				System.out.println("Variable that almost only used in the deleted part is: ");
-				double Ratio_Variable = ratio_u(deletedVariable, srcVariable, variable_most_used);
-
 				// F3 the ratio of frequency of variable access in the deleted part to that in src
 				delVarAcc = new ArrayList<CtVariableAccess>(
 						deleted.getElements(new TypeFilter(CtVariableAccess.class)));
-				srcVarAcc = new ArrayList<CtVariableAccess>(
-						blk.getElements(new TypeFilter(CtVariableAccess.class)));
-				System.out
-						.println("Variable Access that almost only used in the deleted part is: ");
-				double Ratio_Variable_Access = ratio_u(delVarAcc, srcVarAcc,
-						variable_access_most_used);
+				srcVarAcc = new ArrayList<CtVariableAccess>(blk.getElements(new TypeFilter(CtVariableAccess.class)));
+				System.out.println("Variable Access that almost only used in the deleted part is: ");
+				double Ratio_Variable_Access = ratio_u(delVarAcc, srcVarAcc, variable_access_most_used);
 
 				// F3 the ratio of frequency of field access in the deleted part to that in src
-				delFieldAcc = new ArrayList<CtFieldAccess>(
-						deleted.getElements(new TypeFilter(CtFieldAccess.class)));
-				srcFieldAcc = new ArrayList<CtFieldAccess>(
-						blk.getElements(new TypeFilter(CtFieldAccess.class)));
+				delFieldAcc = new ArrayList<CtFieldAccess>(deleted.getElements(new TypeFilter(CtFieldAccess.class)));
+				srcFieldAcc = new ArrayList<CtFieldAccess>(blk.getElements(new TypeFilter(CtFieldAccess.class)));
 				System.out.println("Field Access that almost only used in the deleted part is: ");
-				double Ratio_Field_Access = ratio_u(delFieldAcc, srcFieldAcc,
-						field_access_most_used);
+				double Ratio_Field_Access = ratio_u(delFieldAcc, srcFieldAcc, field_access_most_used);
 
 				// F3 the ratio of frequency of invocation in the deleted part to that in src
-				delInvo = new ArrayList<CtInvocation>(
-						deleted.getElements(new TypeFilter(CtInvocation.class)));
-				srcInvo = new ArrayList<CtInvocation>(
-						blk.getElements(new TypeFilter(CtInvocation.class)));
+				delInvo = new ArrayList<CtInvocation>(deleted.getElements(new TypeFilter(CtInvocation.class)));
+				srcInvo = new ArrayList<CtInvocation>(blk.getElements(new TypeFilter(CtInvocation.class)));
 				System.out.println("Invocation that almost only used in the deleted part is: ");
 				double Ratio_Invocation = ratio_u(delInvo, srcInvo, invocation_most_used);
 
 				// F3 the ratio of frequency of type access in the deleted part to that in src
-				delTypeAcc = new ArrayList<CtTypeAccess>(
-						deleted.getElements(new TypeFilter(CtTypeAccess.class)));
-				srcTypeAcc = new ArrayList<CtTypeAccess>(
-						blk.getElements(new TypeFilter(CtTypeAccess.class)));
+				delTypeAcc = new ArrayList<CtTypeAccess>(deleted.getElements(new TypeFilter(CtTypeAccess.class)));
+				srcTypeAcc = new ArrayList<CtTypeAccess>(blk.getElements(new TypeFilter(CtTypeAccess.class)));
 				System.out.println("Type Access that almost only used in the deleted part is: ");
+				int Src_Num_Type_Acc = srcTypeAcc.size();
 				double Ratio_Type_Access = ratio_u(delTypeAcc, srcTypeAcc, type_access_most_used);
 
 				// F3 the ratio of frequency of typed element in the deleted part to that in src
-				delTypedEle = new ArrayList<CtTypedElement>(
-						deleted.getElements(new TypeFilter(CtTypedElement.class)));
-				srcTypedEle = new ArrayList<CtTypedElement>(
-						blk.getElements(new TypeFilter(CtTypedElement.class)));
+				delTypedEle = new ArrayList<CtTypedElement>(deleted.getElements(new TypeFilter(CtTypedElement.class)));
+				srcTypedEle = new ArrayList<CtTypedElement>(blk.getElements(new TypeFilter(CtTypedElement.class)));
 				System.out.println("Typed element that almost only used in the deleted part is: ");
+				int Num_Typed_Ele = delTypedEle.size();
+				int Src_Num_Typed_Ele = srcTypedEle.size();
 				double Ratio_Typed_Ele = ratio_u(delTypedEle, srcTypedEle, typed_ele_most_used);
-
-				// F3 the ratio of frequency of modifiables in the deleted part to that in src
-				delMod = new ArrayList<CtModifiable>(
-						deleted.getElements(new TypeFilter(CtModifiable.class)));
-				srcMod = new ArrayList<CtModifiable>(
-						blk.getElements(new TypeFilter(CtModifiable.class)));
-				System.out.println("Modifiables that almost only used in the deleted part is: ");
-				double Ratio_Modifiable = ratio_u(delMod, srcMod, modifiable_most_used);
 
 				// F3 the ratio of frequency of packages in the deleted part to that in src
 				List<CtPackageReferenceImpl> delPackage = new ArrayList<CtPackageReferenceImpl>(
 						deleted.getElements(new TypeFilter(CtPackageReferenceImpl.class)));
 				List<CtPackageReferenceImpl> srcPackage = new ArrayList<CtPackageReferenceImpl>(
 						blk.getElements(new TypeFilter(CtPackageReferenceImpl.class)));
+				int Num_Package = delPackage.size();
+				int Src_Num_Package = srcPackage.size();
 				System.out.println("Package that almost only used in the deleted part is: ");
 				double Ratio_Package = ratio(delPackage, srcPackage, package_most_used);
 				// Print
-				printer.printRecord(Src_LOC, Src_Num_local, Src_Num_Literal, Src_Num_Invocation,
-						Src_Num_Loop, Src_Num_While, Src_Num_For, Src_Num_If, Src_Num_Conditional,
-						Src_Num_Switch, Src_Num_Var_Ac, Src_Num_Field_Ac, Src_Num_Arr_Ac,
-						Src_Num_Assert, Src_Num_Assign, LOC_Extracted_Method, Num_local,
-						Num_Literal, Num_Invocation, Num_Loop, Num_While, Num_For, Num_If,
-						Num_Conditional, Num_Switch, Num_Var_Ac, Num_Field_Ac, Num_Arr_Ac,
-						Num_Assert, Num_Assign, Ratio_Variable_Access, Ratio_Field_Access,
-						Ratio_Invocation, Ratio_Type_Access, Ratio_Typed_Ele, Ratio_Modifiable,
-						Ratio_Package);
+				printer.printRecord(Src_LOC, Src_Num_local, Src_Num_Literal, Src_Num_Invocation, Src_Num_If,
+						Src_Num_Conditional, Src_Num_Switch, Src_Num_Var_Ac, Src_Num_Type_Ac, Src_Num_Field_Ac,
+						Src_Num_Assert, Src_Num_Assign, Src_Num_Typed_Ele, Src_Num_Package, LOC_Extracted_Method,
+						Num_Variable, Num_local, Num_Literal, Num_Invocation, Num_If, Num_Conditional, Num_Switch,
+						Num_Var_Ac, Num_Type_Ac, Num_Field_Ac, Num_Assign, Num_Typed_Ele, Num_Package, ratio_LOC,
+						Ratio_Variable_Access, Ratio_Field_Access, Ratio_Type_Access, Ratio_Typed_Ele, Ratio_Package);
 				printer.flush();
 			}
 			printer.close();
@@ -724,14 +665,13 @@ public class DiffImpl implements Diff {
 		}
 	}
 
-	private double ratio(List<CtPackageReferenceImpl> delPackage,
-			List<CtPackageReferenceImpl> srcPackage, CtPackageReferenceImpl pkg) {
+	private double ratio(List<CtPackageReferenceImpl> delPackage, List<CtPackageReferenceImpl> srcPackage,
+			CtPackageReferenceImpl pkg) {
 		// TODO Auto-generated method stub
 		List<CtPackageReferenceImpl> parPackage = new ArrayList<CtPackageReferenceImpl>();
 		for (int p = 0; p < extracted_Method.getParameters().size(); p++) {
 			CtParameter par = (CtParameter) extracted_Method.getParameters().get(p);
-			List<CtPackageReferenceImpl> ttt = par.getType()
-					.getElements(new TypeFilter(CtPackageReferenceImpl.class));
+			List<CtPackageReferenceImpl> ttt = par.getType().getElements(new TypeFilter(CtPackageReferenceImpl.class));
 			for (int k = 0; k < ttt.size(); k++) {
 				parPackage.add(ttt.get(k));
 			}
@@ -753,7 +693,7 @@ public class DiffImpl implements Diff {
 			temp = delPackage2.get(i);
 			num1 = Collections.frequency(delPackage, temp);
 			num2 = Collections.frequency(srcPackage, temp);
-			if (num2 != 0 && num2 != 1) {
+			if (num2 != 0) {
 				all_ratios[i] = num1 / (double) num2;
 			} else {
 				all_ratios[i] = 0;
@@ -791,12 +731,11 @@ public class DiffImpl implements Diff {
 			temp = delPackage2.get(i);
 			num1 = Collections.frequency(delPackage, temp);
 			num2 = Collections.frequency(srcPackage, temp);
-			if (num2 != 0 && num2 != 1) {
+			if (num2 != 0) {
 				all_ratios[i] = num1 / (double) num2;
 			} else {
 				all_ratios[i] = 0;
 			}
-
 		}
 		double result = 0;
 		int index = -1;
@@ -838,12 +777,11 @@ public class DiffImpl implements Diff {
 	private String toStringAction(Action action) throws IOException {
 		String newline = System.getProperty("line.separator");
 		StringBuilder stringBuilder = new StringBuilder();
-		CtElement element = (CtElement) action.getNode()
-				.getMetadata(SpoonGumTreeBuilder.SPOON_OBJECT);
+		CtElement element = (CtElement) action.getNode().getMetadata(SpoonGumTreeBuilder.SPOON_OBJECT);
 		if (element != null) {
 			// element != Try
-			if (!((element.getClass().getSimpleName().substring(2,
-					element.getClass().getSimpleName().length() - 4)).equalsIgnoreCase("Try"))) {
+			if (!((element.getClass().getSimpleName().substring(2, element.getClass().getSimpleName().length() - 4))
+					.equalsIgnoreCase("Try"))) {
 				// action name
 				stringBuilder.append(action.getClass().getSimpleName());
 				System.out.println("action: " + action.getClass().getSimpleName());
@@ -872,14 +810,12 @@ public class DiffImpl implements Diff {
 						if (te2.getSimpleName().toString().equals(Name_Src_Mtd)
 								&& element.toString().contains(Name_Ext_Mtd)) {
 							callMethod.add(te2);
-						} else if (te2.getSimpleName().toString().equals(Name_Ext_Mtd)
-								&& flagtemp == false) {
+						} else if (te2.getSimpleName().toString().equals(Name_Ext_Mtd) && flagtemp == false) {
 							flagtemp = true;
 							System.out.println("--------------------A new method is inserted!");
 							extracted_Method = te2;
 						}
-					} else if (element.toString().contains(Name_Ext_Mtd)
-							&& !nodeType.equalsIgnoreCase("Constructor")) {
+					} else if (element.toString().contains(Name_Ext_Mtd) && !nodeType.equalsIgnoreCase("Constructor")) {
 						CtElement callIt = element;
 						while (!(callIt instanceof CtMethod) && !(callIt instanceof CtConstructor)
 								&& !(callIt instanceof CtClass)) {
@@ -935,13 +871,11 @@ public class DiffImpl implements Diff {
 					}
 				}
 				if (action instanceof Move) {
-					if (!nodeType.equalsIgnoreCase("ThisAccess")
-							&& !nodeType.equalsIgnoreCase("TypeAccess")
+					if (!nodeType.equalsIgnoreCase("ThisAccess") && !nodeType.equalsIgnoreCase("TypeAccess")
 							&& !nodeType.equalsIgnoreCase("Constructor")) {
 						if (!(element instanceof CtMethod)) {
 							CtElement callIt = element;
-							while (!(callIt instanceof CtMethod)
-									&& !(callIt instanceof CtConstructor)
+							while (!(callIt instanceof CtMethod) && !(callIt instanceof CtConstructor)
 									&& !(callIt instanceof CtClass)) {
 								callIt = callIt.getParent();
 							}
@@ -967,10 +901,10 @@ public class DiffImpl implements Diff {
 						}
 						CtElement elementDest = (CtElement) action.getNode()
 								.getMetadata(SpoonGumTreeBuilder.SPOON_OBJECT_DEST);
-						position = " from " + element.getParent(CtClass.class).getQualifiedName()
-								+ ":" + element.getPosition().getLine();
-						position += " to " + elementDest.getParent(CtClass.class).getQualifiedName()
-								+ ":" + elementDest.getPosition().getLine();
+						position = " from " + element.getParent(CtClass.class).getQualifiedName() + ":"
+								+ element.getPosition().getLine();
+						position += " to " + elementDest.getParent(CtClass.class).getQualifiedName() + ":"
+								+ elementDest.getPosition().getLine();
 					}
 				}
 				stringBuilder.append(position).append(newline);
@@ -1004,8 +938,7 @@ public class DiffImpl implements Diff {
 							.getMetadata(SpoonGumTreeBuilder.SPOON_OBJECT_DEST);
 					if (elementDest instanceof CtMethod) {
 						CtMethod temp_dest = (CtMethod) elementDest;
-						if (flagtemp == false
-								&& temp_dest.getSimpleName().toString().equals(Name_Ext_Mtd)) {
+						if (flagtemp == false && temp_dest.getSimpleName().toString().equals(Name_Ext_Mtd)) {
 							flagtemp = true;
 							extracted_Method = temp_dest;
 							System.out.println("--------------------A new method is updated !");
