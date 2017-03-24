@@ -13,7 +13,6 @@ import java.util.stream.Collectors;
 // import java.util.Random;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-
 import com.github.gumtreediff.actions.ActionGenerator;
 import com.github.gumtreediff.actions.model.Action;
 import com.github.gumtreediff.actions.model.Delete;
@@ -558,7 +557,8 @@ public class DiffImpl implements Diff {
 				System.out.println("hellllllo" + blk2);
 
 				// F1 metrics (context)
-				int Src_LOC = blk2.getStatements().size();
+				int Src_LOC = getLOC(blk2);
+				// System.out.println("loc of context: " + Src_LOC);
 				int Src_Num_Variable = blk2.getElements(new TypeFilter(CtVariable.class)).size();
 				int Src_Num_local = blk2.getElements(new TypeFilter(CtLocalVariable.class)).size();
 				int Src_Num_Literal = blk2.getElements(new TypeFilter(CtLiteral.class)).size();
@@ -580,10 +580,12 @@ public class DiffImpl implements Diff {
 				int Src_Num_Assign = blk2.getElements(new TypeFilter(CtAssignment.class)).size();
 
 				// F2 metrics
-				LOC_Extracted_Method = extracted_Method.getBody().getStatements().size();
+				LOC_Extracted_Method = getLOC(deleted);
+				// System.out.println("loc of extracted code: " + LOC_Extracted_Method);
 				double ratio_LOC = 0;
-				if (blk.getStatements().size() > 0) {
-					ratio_LOC = LOC_Extracted_Method / (double) blk.getStatements().size();
+				System.out.println("loc of source code: " + getLOC(blk));
+				if (getLOC(blk) > 0) {
+					ratio_LOC = LOC_Extracted_Method / (double) getLOC(blk);
 				}
 				// variable
 				Num_Variable = deleted.getElements(new TypeFilter(CtVariable.class)).size();
@@ -680,6 +682,25 @@ public class DiffImpl implements Diff {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private int getLOC(CtElement blk2) {
+		// TODO get lines of code
+		List<CtStatement> sta_list = blk2.getElements(new TypeFilter(CtStatement.class));
+		int start, end;
+		start = end = sta_list.get(0).getPosition().getLine();
+		for (int i = 0; i < sta_list.size(); i++) {
+			int temp = sta_list.get(i).getPosition().getLine();
+			if (temp < start) {
+				start = temp;
+			} else if (temp > end) {
+				end = temp;
+			}
+		}
+		int loc = end - start;
+		System.out.println("start: " + start);
+		System.out.println("end: " + end);
+		return loc;
 	}
 
 	private double ratio(List<CtPackageReferenceImpl> delPackage, List<CtPackageReferenceImpl> srcPackage,
