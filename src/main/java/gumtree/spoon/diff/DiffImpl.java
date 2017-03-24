@@ -9,12 +9,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Random;
 import java.util.stream.Collectors;
-// import spoon.reflect.factory.Factory;
-// import spoon.reflect.factory.FactoryImpl;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
+
 // import org.apache.log4j.Level;
 import com.github.gumtreediff.actions.ActionGenerator;
 import com.github.gumtreediff.actions.model.Action;
@@ -38,7 +38,7 @@ import gumtree.spoon.diff.operations.UpdateOperation;
 import spoon.reflect.code.CtAssert;
 import spoon.reflect.code.CtAssignment;
 import spoon.reflect.code.CtBlock;
-// import spoon.reflect.code.CtCodeSnippetStatement;
+import spoon.reflect.code.CtCodeSnippetStatement;
 import spoon.reflect.code.CtComment;
 import spoon.reflect.code.CtConditional;
 import spoon.reflect.code.CtExecutableReferenceExpression;
@@ -63,9 +63,12 @@ import spoon.reflect.declaration.CtParameter;
 import spoon.reflect.declaration.CtType;
 import spoon.reflect.declaration.CtTypedElement;
 import spoon.reflect.declaration.CtVariable;
+import spoon.reflect.factory.Factory;
+// import spoon.reflect.factory.Factory;
+import spoon.reflect.factory.FactoryImpl;
 import spoon.reflect.visitor.filter.TypeFilter;
-// import spoon.support.DefaultCoreFactory;
-// import spoon.support.StandardEnvironment;
+import spoon.support.DefaultCoreFactory;
+import spoon.support.StandardEnvironment;
 import spoon.support.reflect.reference.CtPackageReferenceImpl;
 // import spoon.reflect.factory.CodeFactory;;;
 
@@ -90,9 +93,14 @@ public class DiffImpl implements Diff {
 	CtTypedElement typed_ele_most_used;
 	CtModifiable modifiable_most_used;
 
-	List<CtElement> callMethod = new ArrayList<CtElement>(); // after version里的source method
-	List<CtElement> sourceMethod = new ArrayList<CtElement>(); // before version里的source method
-	List<CtElement> deleteStuff = new ArrayList<CtElement>(); // before version里source
+	List<CtElement> callMethod = new ArrayList<CtElement>(); // after
+																// version里的source
+																// method
+	List<CtElement> sourceMethod = new ArrayList<CtElement>(); // before
+																// version里的source
+																// method
+	List<CtElement> deleteStuff = new ArrayList<CtElement>(); // before
+																// version里source
 																// method被delete的code
 	CtMethod extracted_Method; // extracted method
 	CtElement deleted; // deleted code
@@ -506,7 +514,7 @@ public class DiffImpl implements Diff {
 
 	public void print_file() {
 		// ---------------------------------------------Print
-		File file = new File("src_pos.csv");
+		File file = new File("file_src_neg.csv");
 		CSVFormat format = null;
 		if (file.exists()) {
 			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal", "Src_Num_Invocation",
@@ -525,7 +533,7 @@ public class DiffImpl implements Diff {
 					"Num_Typed_Ele", "Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Field_Access",
 					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Package");
 		}
-		try (Writer out = new FileWriter("src_pos.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
+		try (Writer out = new FileWriter("file_src_neg.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
 			System.out.println("--------------source method----------------" + sourceMethod.size());
 			for (int w = 0; w < sourceMethod.size(); w++) {
 
@@ -539,15 +547,25 @@ public class DiffImpl implements Diff {
 					blk = constr.getBody();
 				}
 
+				// 生成负例
+				// 初始化一个空cblk
+				CtBlock cblk = newBlock(blk);
+				// System.out.println("should be empty:" + cblk.toString());
+
+				// 根据source method(blk)随机生成statement lists作为cblk
+				cblk = getRandomStat(blk);
+				deleted = cblk;
+				System.out.println("negative sample" + deleted.toString());
+
 				// get the src
 				// F1 metrics (src)
 				int Src_LOC = blk.getStatements().size();
-				System.out.println("LOC of src:" + Src_LOC);
 				int Src_Num_local = blk.getElements(new TypeFilter(CtLocalVariable.class)).size();
 				int Src_Num_Literal = blk.getElements(new TypeFilter(CtLiteral.class)).size();
 				int Src_Num_Assert = blk.getElements(new TypeFilter(CtAssert.class)).size();
 				int Src_Num_Com = blk.getElements(new TypeFilter(CtComment.class)).size();
-				// int Src_Num_Annotation = m.getBody().getElements(new TypeFilter(CtAnnotation.class)).size();
+				// int Src_Num_Annotation = m.getBody().getElements(new
+				// TypeFilter(CtAnnotation.class)).size();
 				int Src_Num_Invocation = blk.getElements(new TypeFilter(CtInvocation.class)).size();
 				int Src_Num_Executable = blk.getElements(new TypeFilter(CtExecutable.class)).size();
 				int Src_Num_ExeRefExp = blk.getElements(new TypeFilter(CtExecutableReferenceExpression.class)).size();
@@ -580,33 +598,38 @@ public class DiffImpl implements Diff {
 				Num_Type_Ac = deleted.getElements(new TypeFilter(CtTypeAccess.class)).size();
 				Num_Field_Ac = deleted.getElements(new TypeFilter(CtFieldAccess.class)).size();
 				Num_Assign = deleted.getElements(new TypeFilter(CtAssignment.class)).size();
-				// F3 the ratio of frequency of variable access in the deleted part to that in src
+
+				// F3 the ratio of frequency of variable access in the deleted
+				// part to that in src
 				delVarAcc = new ArrayList<CtVariableAccess>(
 						deleted.getElements(new TypeFilter(CtVariableAccess.class)));
 				srcVarAcc = new ArrayList<CtVariableAccess>(blk.getElements(new TypeFilter(CtVariableAccess.class)));
 				System.out.println("Variable Access that almost only used in the deleted part is: ");
 				double Ratio_Variable_Access = ratio_u(delVarAcc, srcVarAcc, variable_access_most_used);
 
-				// F3 the ratio of frequency of field access in the deleted part to that in src
+				// F3 the ratio of frequency of field access in the deleted part
+				// to that in src
 				delFieldAcc = new ArrayList<CtFieldAccess>(deleted.getElements(new TypeFilter(CtFieldAccess.class)));
 				srcFieldAcc = new ArrayList<CtFieldAccess>(blk.getElements(new TypeFilter(CtFieldAccess.class)));
 				System.out.println("Field Access that almost only used in the deleted part is: ");
 				double Ratio_Field_Access = ratio_u(delFieldAcc, srcFieldAcc, field_access_most_used);
 
-				// F3 the ratio of frequency of invocation in the deleted part to that in src
+				// F3 the ratio of frequency of invocation in the deleted part
+				// to that in src
 				delInvo = new ArrayList<CtInvocation>(deleted.getElements(new TypeFilter(CtInvocation.class)));
 				srcInvo = new ArrayList<CtInvocation>(blk.getElements(new TypeFilter(CtInvocation.class)));
 				System.out.println("Invocation that almost only used in the deleted part is: ");
 				double Ratio_Invocation = ratio_u(delInvo, srcInvo, invocation_most_used);
 
-				// F3 the ratio of frequency of type access in the deleted part to that in src
+				// F3 the ratio of frequency of type access in the deleted part
+				// to that in src
 				delTypeAcc = new ArrayList<CtTypeAccess>(deleted.getElements(new TypeFilter(CtTypeAccess.class)));
 				srcTypeAcc = new ArrayList<CtTypeAccess>(blk.getElements(new TypeFilter(CtTypeAccess.class)));
 				System.out.println("Type Access that almost only used in the deleted part is: ");
-				int Src_Num_Type_Acc = srcTypeAcc.size();
 				double Ratio_Type_Access = ratio_u(delTypeAcc, srcTypeAcc, type_access_most_used);
 
-				// F3 the ratio of frequency of typed element in the deleted part to that in src
+				// F3 the ratio of frequency of typed element in the deleted
+				// part to that in src
 				delTypedEle = new ArrayList<CtTypedElement>(deleted.getElements(new TypeFilter(CtTypedElement.class)));
 				srcTypedEle = new ArrayList<CtTypedElement>(blk.getElements(new TypeFilter(CtTypedElement.class)));
 				System.out.println("Typed element that almost only used in the deleted part is: ");
@@ -614,7 +637,8 @@ public class DiffImpl implements Diff {
 				int Src_Num_Typed_Ele = srcTypedEle.size();
 				double Ratio_Typed_Ele = ratio_u(delTypedEle, srcTypedEle, typed_ele_most_used);
 
-				// F3 the ratio of frequency of packages in the deleted part to that in src
+				// F3 the ratio of frequency of packages in the deleted part to
+				// that in src
 				List<CtPackageReferenceImpl> delPackage = new ArrayList<CtPackageReferenceImpl>(
 						deleted.getElements(new TypeFilter(CtPackageReferenceImpl.class)));
 				List<CtPackageReferenceImpl> srcPackage = new ArrayList<CtPackageReferenceImpl>(
@@ -641,9 +665,71 @@ public class DiffImpl implements Diff {
 		}
 	}
 
+	private CtBlock getRandomStat(CtBlock blk) {
+		// 随机选一个block，并随机选择其中的几个相邻的语句
+		// 生成一个空的cblk
+		CtBlock cblk = newBlock(blk);
+
+		// 获取全部的blocks
+		List<CtBlock> all_blocks = blk.getElements(new TypeFilter(CtBlock.class));
+		System.out.println("number of blocks: " + all_blocks.size());
+
+		// 随机获取一个block
+		int random = genRandom(0, all_blocks.size() - 1);
+		CtBlock tblk = all_blocks.get(random);
+
+		// 随机获取相邻的语句
+		int size = tblk.getStatements().size();
+		int start = genRandom(0, size - 1);
+		int end = genRandom(start, size - 1);
+		for (int i = start; i <= end; i++) {
+			cblk.addStatement(tblk.getStatement(i));
+		}
+		if (start == end && (cblk.toString().contains("break;") || cblk.toString().contains("return")
+				|| cblk.toString().contains("continue;"))) {
+			getRandomStat(blk);
+		}
+		System.out.println("should not be empty: " + cblk.toString());
+		return cblk;
+	}
+
+	private CtBlock newBlock(CtBlock blk) {
+		// TODO Auto-generated method stub
+		CtBlock cblk = blk.clone();
+		for (int y = 0; y < cblk.getStatements().size(); y++) {
+			cblk.removeStatement(cblk.getStatement(y));
+			y--;
+		}
+		return cblk;
+	}
+
+	private boolean isToken(String string) {
+		// 判断随机取出的子句是不是一个token语句
+		boolean istoken = false;
+		if (string.equals("break") || string.equals("return") || string.equals("continue")
+				|| string.equals("default")) {
+			istoken = true;
+		}
+		return istoken;
+	}
+
+	private CtBlock createBlock(String string) {
+		// TODO Auto-generated method stub
+		Factory factory = new FactoryImpl(new DefaultCoreFactory(), new StandardEnvironment());
+		CtCodeSnippetStatement statementInConstructor = factory.Code().createCodeSnippetStatement(string);
+		CtBlock CtBlockOfConstructor = factory.Code().createCtBlock(statementInConstructor);
+		return CtBlockOfConstructor;
+	}
+
+	private int genRandom(int MIN, int MAX) {
+		// 生成一个随机整数
+		Random rand = new Random();
+		return (rand.nextInt(MAX - MIN + 1) + MIN);
+	}
+
 	private double ratio(List<CtPackageReferenceImpl> delPackage, List<CtPackageReferenceImpl> srcPackage,
 			CtPackageReferenceImpl pkg) {
-		// TODO Auto-generated method stub
+		// 计算cohesion
 		List<CtPackageReferenceImpl> parPackage = new ArrayList<CtPackageReferenceImpl>();
 		for (int p = 0; p < extracted_Method.getParameters().size(); p++) {
 			CtParameter par = (CtParameter) extracted_Method.getParameters().get(p);
