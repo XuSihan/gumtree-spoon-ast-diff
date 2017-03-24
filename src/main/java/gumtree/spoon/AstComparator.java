@@ -76,8 +76,8 @@ public class AstComparator {
 	 */
 	public Diff compare(CtElement left, CtElement right, String Extracted_Mtd, String Src_Mtd) {
 		final SpoonGumTreeBuilder scanner = new SpoonGumTreeBuilder();
-		return new DiffImpl(scanner.getTreeContext(), scanner.getTree(left), scanner.getTree(right),
-				Extracted_Mtd, Src_Mtd);
+		return new DiffImpl(scanner.getTreeContext(), scanner.getTree(left), scanner.getTree(right), Extracted_Mtd,
+				Src_Mtd);
 	}
 
 	private CtType getCtType(File file) throws Exception {
@@ -107,8 +107,7 @@ public class AstComparator {
 			return;
 		}
 
-		final Diff result = new AstComparator().compare(new File(args[0]), new File(args[1]), args[2],
-				args[3]);
+		final Diff result = new AstComparator().compare(new File(args[0]), new File(args[1]), args[2], args[3]);
 		System.out.println(result.toString());
 	}
 }
