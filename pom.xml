@@ -69,7 +69,7 @@
           <artifactId>jms</artifactId>
         </exclusion>
       </exclusions>
-      <scope>test</scope>
+      <scope>runtime</scope>
     </dependency>
 
     <dependency>

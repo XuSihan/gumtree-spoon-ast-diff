@@ -578,7 +578,10 @@ public class DiffImpl implements Diff {
 
 					fileWriter2.write("-----------------------candidate" + kl + "---------------------" + "\n" + "\n"
 							+ deleted.toString() + "\n" + "\n");
-
+					int start = cblk.getStatement(0).getPosition().getLine();
+					int end = cblk.getLastStatement().getPosition().getLine();
+					fileWriter2.write("start: " + start);
+					fileWriter2.write("end: " + end);
 					// get the context
 					// F1 metrics (context)
 					LOC_Extracted_Method = cblk.getStatements().size();
