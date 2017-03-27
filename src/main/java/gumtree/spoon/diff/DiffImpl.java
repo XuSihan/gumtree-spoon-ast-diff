@@ -558,10 +558,12 @@ public class DiffImpl implements Diff {
 
 				// F1 metrics (context)
 				int Src_LOC = getLOC(blk2);
-				// System.out.println("loc of context: " + Src_LOC);
 				int Src_Num_Variable = blk2.getElements(new TypeFilter(CtVariable.class)).size();
 				int Src_Num_local = blk2.getElements(new TypeFilter(CtLocalVariable.class)).size();
 				int Src_Num_Literal = blk2.getElements(new TypeFilter(CtLiteral.class)).size();
+				if (Src_Num_Literal > 0) {
+					Src_Num_Literal = 1;
+				}
 				int Src_Num_Assert = blk2.getElements(new TypeFilter(CtAssert.class)).size();
 				int Src_Num_Com = blk2.getElements(new TypeFilter(CtComment.class)).size();
 				int Src_Num_Invocation = blk2.getElements(new TypeFilter(CtInvocation.class)).size();
@@ -583,9 +585,10 @@ public class DiffImpl implements Diff {
 				LOC_Extracted_Method = getLOC(deleted);
 				// System.out.println("loc of extracted code: " + LOC_Extracted_Method);
 				double ratio_LOC = 0;
-				System.out.println("loc of source code: " + getLOC(blk));
-				if (getLOC(blk) > 0) {
-					ratio_LOC = LOC_Extracted_Method / (double) getLOC(blk);
+				int LOC_Src = getLOC(blk);
+				// System.out.println("loc of source code: " + LOC_Src);
+				if (LOC_Src > 0) {
+					ratio_LOC = LOC_Extracted_Method / (double) LOC_Src;
 				}
 				// variable
 				Num_Variable = deleted.getElements(new TypeFilter(CtVariable.class)).size();
@@ -593,6 +596,9 @@ public class DiffImpl implements Diff {
 
 				// Literal
 				Num_Literal = deleted.getElements(new TypeFilter(CtLiteral.class)).size();
+				if (Num_Literal > 0) {
+					Num_Literal = 1;
+				}
 
 				// Comments & Annotation
 				Num_Com = deleted.getElements(new TypeFilter(CtComment.class)).size();
@@ -667,7 +673,7 @@ public class DiffImpl implements Diff {
 				System.out.println("Package that almost only used in the deleted part is: ");
 				double Ratio_Package = ratio(delPackage, srcPackage, package_most_used);
 				// Print
-				if (blk.getStatements().size() > 1) {
+				if (LOC_Src > 1) {
 					printer.printRecord(Src_LOC, Src_Num_local, Src_Num_Literal, Src_Num_Invocation, Src_Num_If,
 							Src_Num_Conditional, Src_Num_Switch, Src_Num_Var_Ac, Src_Num_Type_Ac, Src_Num_Field_Ac,
 							Src_Num_Assert, Src_Num_Assign, Src_Num_Typed_Ele, Src_Num_Package, LOC_Extracted_Method,
