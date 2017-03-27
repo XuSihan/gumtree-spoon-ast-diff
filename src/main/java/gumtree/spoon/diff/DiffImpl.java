@@ -46,7 +46,7 @@ import spoon.reflect.code.CtIf;
 import spoon.reflect.code.CtInvocation;
 import spoon.reflect.code.CtLiteral;
 import spoon.reflect.code.CtLocalVariable;
-import spoon.reflect.code.CtStatement;
+// import spoon.reflect.code.CtStatement;
 import spoon.reflect.code.CtSwitch;
 import spoon.reflect.code.CtTypeAccess;
 import spoon.reflect.code.CtVariableAccess;
@@ -371,8 +371,6 @@ public class DiffImpl implements Diff {
 	public static <T> List<T> minusList(List<T> src, List<T> deleted) {
 		List<T> list = new ArrayList<T>(src);
 		List<T> list2 = new ArrayList<T>(deleted);
-		System.out.println("copy src: " + list.toString());
-		System.out.println("copy deleted: " + list2.toString());
 		for (int i = 0; i < list2.size(); i++) {
 			T str = list2.get(i); // 获取传入集合对象的每一个元素
 			if (list.contains(str)) { // 查看新集合中是否有指定的元素，如果没有则加入
@@ -411,7 +409,7 @@ public class DiffImpl implements Diff {
 		for (t = 0; t < size3; t++) {
 			tempEl = deleteStuff.get(t);
 			sim2 = sim(tempEl.toString(), extracted_Method.getBody().toString());
-			System.out.println("the code is: " + tempEl.toString() + "the similarity of this stuff is: " + sim2);
+			// System.out.println("the code is: " + tempEl.toString() + "the similarity of this stuff is: " + sim2);
 			if (sim2 > sim1) {
 				deleted = tempEl;
 				sim1 = sim2;
@@ -419,7 +417,7 @@ public class DiffImpl implements Diff {
 		}
 		if (size3 == 0 || sim(deleted.toString(), extracted_Method.getBody().toString()) < 0.6) {
 			deleted = extracted_Method.getBody();
-			System.out.println("use extracted method directly");
+			// System.out.println("use extracted method directly");
 		}
 		File file_before = new File("before_method");
 		file_before.createNewFile();
@@ -550,7 +548,6 @@ public class DiffImpl implements Diff {
 		try (Writer out = new FileWriter("con_neg.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
 			System.out.println("--------------source method----------------" + sourceMethod.size());
 			for (int w = 0; w < sourceMethod.size(); w++) {
-
 				// get the body of source method: blk
 				CtBlock blk = null;
 				if (sourceMethod.get(w) instanceof CtMethod) {
@@ -564,20 +561,26 @@ public class DiffImpl implements Diff {
 				// 生成负例
 				// 初始化一个空cblk
 				CtBlock cblk = newBlock(blk);
-				// System.out.println("should be empty:" + cblk.toString());
 
 				// 根据source method(blk)随机生成statement lists作为cblk
 				cblk = getRandomStat(blk);
 				deleted = cblk;
-
+				// System.out.println("negative sample: " + cblk.toString());
 				// get the context
 				// F1 metrics (context)
-				LOC_Extracted_Method = cblk.getStatements().size();
-				int Src_LOC = getContex(blk, cblk);
+				LOC_Extracted_Method = getLOC(cblk);
+				int LOC_Src = getLOC(blk);
+				int Src_LOC = LOC_Src - LOC_Extracted_Method;
+				if (Src_LOC < 0) {
+					Src_LOC = 0;
+				}
 				int Src_Num_local = minusList(blk.getElements(new TypeFilter(CtLocalVariable.class)),
 						deleted.getElements(new TypeFilter(CtLocalVariable.class))).size();
 				int Src_Num_Literal = minusList(blk.getElements(new TypeFilter(CtLiteral.class)),
 						deleted.getElements(new TypeFilter(CtLiteral.class))).size();
+				if (Src_Num_Literal > 0) {
+					Src_Num_Literal = 1;
+				}
 				int Src_Num_Assert = minusList(blk.getElements(new TypeFilter(CtAssert.class)),
 						deleted.getElements(new TypeFilter(CtAssert.class))).size();
 				int Src_Num_Com = minusList(blk.getElements(new TypeFilter(CtComment.class)),
@@ -609,14 +612,17 @@ public class DiffImpl implements Diff {
 						deleted.getElements(new TypeFilter(CtPackageReferenceImpl.class))).size();
 				double ratio_LOC = 0;
 				// F2 metrics
-				if (blk.getStatements().size() > 0) {
-					ratio_LOC = LOC_Extracted_Method / (double) blk.getStatements().size();
+				if (LOC_Src > 0) {
+					ratio_LOC = LOC_Extracted_Method / (double) LOC_Src;
 				}
 				// variable
 				Num_Variable = deleted.getElements(new TypeFilter(CtVariable.class)).size();
 				Num_local = deleted.getElements(new TypeFilter(CtLocalVariable.class)).size();
 				// Literal
 				Num_Literal = deleted.getElements(new TypeFilter(CtLiteral.class)).size();
+				if (Num_Literal > 0) {
+					Num_Literal = 1;
+				}
 				// Invocation
 				Num_Invocation = deleted.getElements(new TypeFilter(CtInvocation.class)).size();
 				// Structure
@@ -676,7 +682,7 @@ public class DiffImpl implements Diff {
 				System.out.println("Package that almost only used in the deleted part is: ");
 				double Ratio_Package = ratio(delPackage, srcPackage, package_most_used);
 				// Print
-				if (Src_LOC > 0) {
+				if (LOC_Src > 1) {
 					printer.printRecord(Src_LOC, Src_Num_local, Src_Num_Literal, Src_Num_Invocation, Src_Num_If,
 							Src_Num_Conditional, Src_Num_Switch, Src_Num_Var_Ac, Src_Num_Type_Ac, Src_Num_Field_Ac,
 							Src_Num_Assert, Src_Num_Assign, Src_Num_Typed_Ele, Src_Num_Package, LOC_Extracted_Method,
@@ -693,30 +699,11 @@ public class DiffImpl implements Diff {
 		}
 	}
 
-	private int getContex(CtBlock blk, CtBlock cblk) {
-		// 获取context的loc
-		int n = 0;
-		// CtBlock con = newBlock(cblk);
-		int min_pos = cblk.getStatement(0).getPosition().getLine();
-		int max_pos = cblk.getLastStatement().getPosition().getLine();
-		System.out.println("start position: " + min_pos);
-		System.out.println("end position: " + max_pos);
-		CtStatement temp;
-		for (int i = 0; i < blk.getStatements().size(); i++) {
-			temp = blk.getStatement(i);
-			if (blk.getStatement(i).getPosition().getLine() < min_pos) {
-				// con.addStatement(temp);
-				if ((i + 1) < blk.getStatements().size()) {
-					if (blk.getStatement(i + 1).getPosition().getLine() <= min_pos) {
-						n++;
-					}
-				}
-			} else if (blk.getStatement(i).getPosition().getLine() > max_pos) {
-				// con.addStatement(temp);
-				n++;
-			}
-		}
-		return n;
+	private int getLOC(CtBlock cblk) {
+		// TODO get lines of code
+		int start = cblk.getStatement(0).getPosition().getLine();
+		int getEndLine = cblk.getLastStatement().getPosition().getEndLine();
+		return (getEndLine - start + 1);
 	}
 
 	private CtBlock getRandomStat(CtBlock blk) {
@@ -726,16 +713,15 @@ public class DiffImpl implements Diff {
 
 		// 获取全部的blocks
 		List<CtBlock> all_blocks = blk.getElements(new TypeFilter(CtBlock.class));
-		System.out.println("number of blocks: " + all_blocks.size());
 
 		// 随机获取一个block
 		int random = genRandom(0, all_blocks.size() - 1);
 		CtBlock tblk = all_blocks.get(random);
-
 		// 随机获取相邻的语句
 		int size = tblk.getStatements().size();
 		int start = genRandom(0, size - 1);
 		int end = genRandom(start, size - 1);
+		System.out.println("chosen start: " + start + " chosen end: " + end);
 		for (int i = start; i <= end; i++) {
 			cblk.addStatement(tblk.getStatement(i));
 		}
@@ -743,7 +729,7 @@ public class DiffImpl implements Diff {
 				|| cblk.toString().contains("continue;"))) {
 			getRandomStat(blk);
 		}
-		System.out.println("should not be empty: " + cblk.toString());
+		// System.out.println("should not be empty: " + cblk.toString());
 		return cblk;
 	}
 
