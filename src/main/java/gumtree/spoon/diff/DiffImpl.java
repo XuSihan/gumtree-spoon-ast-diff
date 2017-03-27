@@ -11,7 +11,6 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
-
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
@@ -579,9 +578,15 @@ public class DiffImpl implements Diff {
 					fileWriter2.write("-----------------------candidate" + kl + "---------------------" + "\n" + "\n"
 							+ deleted.toString() + "\n" + "\n");
 					int start = cblk.getStatement(0).getPosition().getLine();
-					int end = cblk.getLastStatement().getPosition().getLine();
-					fileWriter2.write("start: " + start);
-					fileWriter2.write("end: " + end);
+					int getEndLine = cblk.getLastStatement().getPosition().getEndLine();
+					int getEndColumn = cblk.getLastStatement().getPosition().getEndColumn();
+					fileWriter2.write("getStartLine: " + start + "\n" + "\n");
+					fileWriter2.write("getStartColumn: " + 0 + "\n" + "\n");
+					fileWriter2.write("getEndLine: " + getEndLine + "\n" + "\n");
+					fileWriter2.write("getEndColumn: " + getEndColumn + "\n" + "\n");
+					fileWriter2.write("getEndLine2: " + (getEndLine + 1) + "\n" + "\n");
+					fileWriter2.write("getEndColumn2: " + 0 + "\n" + "\n");
+
 					// get the context
 					// F1 metrics (context)
 					LOC_Extracted_Method = cblk.getStatements().size();
