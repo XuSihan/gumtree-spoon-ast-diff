@@ -45,7 +45,7 @@ import spoon.reflect.code.CtIf;
 import spoon.reflect.code.CtInvocation;
 import spoon.reflect.code.CtLiteral;
 import spoon.reflect.code.CtLocalVariable;
-import spoon.reflect.code.CtStatement;
+// import spoon.reflect.code.CtStatement;
 import spoon.reflect.code.CtSwitch;
 import spoon.reflect.code.CtTypeAccess;
 import spoon.reflect.code.CtVariableAccess;
@@ -548,7 +548,7 @@ public class DiffImpl implements Diff {
 		}
 		try (Writer out = new FileWriter("con_neg.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
 			System.out.println("--------------source method----------------" + sourceMethod.size());
-			for (int w = 0; w < sourceMethod.size(); w++) {
+			for (int w = 0; w < 1; w++) {
 
 				// get the body of source method: blk
 				CtBlock blk = null;
@@ -567,34 +567,37 @@ public class DiffImpl implements Diff {
 				// 根据source method(blk)随机生成statement lists作为cblk
 				// cblk = getRandomStat(blk);
 				List<CtBlock> exhau_candi = getAllCandi(blk);
-				System.out.println("-=-=-=-=-=: " + exhau_candi);
 				File candidates = new File("candidates");
 				candidates.createNewFile();
 				FileWriter fileWriter2 = new FileWriter(candidates);
 				for (int kl = 0; kl < exhau_candi.size(); kl++) {
 					deleted = exhau_candi.get(kl);
 					CtBlock cblk = exhau_candi.get(kl);
-
+					System.out.println("hel: " + kl);
 					fileWriter2.write("-----------------------candidate" + kl + "---------------------" + "\n" + "\n"
 							+ deleted.toString() + "\n" + "\n");
 					int start = cblk.getStatement(0).getPosition().getLine();
 					int getEndLine = cblk.getLastStatement().getPosition().getEndLine();
-					int getEndColumn = cblk.getLastStatement().getPosition().getEndColumn();
 					fileWriter2.write("getStartLine: " + start + "\n" + "\n");
 					fileWriter2.write("getStartColumn: " + 0 + "\n" + "\n");
-					fileWriter2.write("getEndLine: " + getEndLine + "\n" + "\n");
-					fileWriter2.write("getEndColumn: " + getEndColumn + "\n" + "\n");
-					fileWriter2.write("getEndLine2: " + (getEndLine + 1) + "\n" + "\n");
-					fileWriter2.write("getEndColumn2: " + 0 + "\n" + "\n");
+					fileWriter2.write("getEndLine: " + (getEndLine + 1) + "\n" + "\n");
+					fileWriter2.write("getEndColumn: " + 0 + "\n" + "\n");
 
 					// get the context
 					// F1 metrics (context)
-					LOC_Extracted_Method = cblk.getStatements().size();
-					int Src_LOC = getContex(blk, cblk);
+					LOC_Extracted_Method = getEndLine - start;
+					int LOC_Src = getLOC(blk);
+					int Src_LOC = LOC_Src - LOC_Extracted_Method;
+					if (Src_LOC < 0) {
+						Src_LOC = 0;
+					}
 					int Src_Num_local = minusList(blk.getElements(new TypeFilter(CtLocalVariable.class)),
 							deleted.getElements(new TypeFilter(CtLocalVariable.class))).size();
 					int Src_Num_Literal = minusList(blk.getElements(new TypeFilter(CtLiteral.class)),
 							deleted.getElements(new TypeFilter(CtLiteral.class))).size();
+					if (Src_Num_Literal > 0) {
+						Src_Num_Literal = 1;
+					}
 					int Src_Num_Assert = minusList(blk.getElements(new TypeFilter(CtAssert.class)),
 							deleted.getElements(new TypeFilter(CtAssert.class))).size();
 					int Src_Num_Com = minusList(blk.getElements(new TypeFilter(CtComment.class)),
@@ -634,6 +637,9 @@ public class DiffImpl implements Diff {
 					Num_local = deleted.getElements(new TypeFilter(CtLocalVariable.class)).size();
 					// Literal
 					Num_Literal = deleted.getElements(new TypeFilter(CtLiteral.class)).size();
+					if (Num_Literal > 0) {
+						Num_Literal = 1;
+					}
 					// Invocation
 					Num_Invocation = deleted.getElements(new TypeFilter(CtInvocation.class)).size();
 					// Structure
@@ -715,30 +721,11 @@ public class DiffImpl implements Diff {
 		}
 	}
 
-	private int getContex(CtBlock blk, CtBlock cblk) {
-		// 获取context的loc
-		int n = 0;
-		// CtBlock con = newBlock(cblk);
-		int min_pos = cblk.getStatement(0).getPosition().getLine();
-		int max_pos = cblk.getLastStatement().getPosition().getLine();
-		System.out.println("start position: " + min_pos);
-		System.out.println("end position: " + max_pos);
-		CtStatement temp;
-		for (int i = 0; i < blk.getStatements().size(); i++) {
-			temp = blk.getStatement(i);
-			if (blk.getStatement(i).getPosition().getLine() < min_pos) {
-				// con.addStatement(temp);
-				if ((i + 1) < blk.getStatements().size()) {
-					if (blk.getStatement(i + 1).getPosition().getLine() <= min_pos) {
-						n++;
-					}
-				}
-			} else if (blk.getStatement(i).getPosition().getLine() > max_pos) {
-				// con.addStatement(temp);
-				n++;
-			}
-		}
-		return n;
+	private int getLOC(CtBlock cblk) {
+		// TODO get lines of code
+		int start = cblk.getStatement(0).getPosition().getLine();
+		int getEndLine = cblk.getLastStatement().getPosition().getEndLine();
+		return (getEndLine - start + 1);
 	}
 
 	private CtBlock getRandomStat(CtBlock blk) {
