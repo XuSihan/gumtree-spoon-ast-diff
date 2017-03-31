@@ -32,30 +32,21 @@ import gumtree.spoon.diff.operations.MoveOperation;
 import gumtree.spoon.diff.operations.Operation;
 import gumtree.spoon.diff.operations.OperationKind;
 import gumtree.spoon.diff.operations.UpdateOperation;
-// import spoon.reflect.code.CtArrayAccess;
 import spoon.reflect.code.CtAssert;
 import spoon.reflect.code.CtAssignment;
 import spoon.reflect.code.CtBlock;
-import spoon.reflect.code.CtComment;
 import spoon.reflect.code.CtConditional;
-import spoon.reflect.code.CtExecutableReferenceExpression;
 import spoon.reflect.code.CtFieldAccess;
-// import spoon.reflect.code.CtFor;
 import spoon.reflect.code.CtIf;
 import spoon.reflect.code.CtInvocation;
 import spoon.reflect.code.CtLiteral;
 import spoon.reflect.code.CtLocalVariable;
-// import spoon.reflect.code.CtLoop;
-// import spoon.reflect.code.CtStatement;
-// import spoon.reflect.code.CtStatement;
 import spoon.reflect.code.CtSwitch;
 import spoon.reflect.code.CtTypeAccess;
 import spoon.reflect.code.CtVariableAccess;
-// import spoon.reflect.code.CtWhile;
 import spoon.reflect.declaration.CtClass;
 import spoon.reflect.declaration.CtConstructor;
 import spoon.reflect.declaration.CtElement;
-import spoon.reflect.declaration.CtExecutable;
 import spoon.reflect.declaration.CtMethod;
 import spoon.reflect.declaration.CtModifiable;
 import spoon.reflect.declaration.CtPackage;
@@ -349,6 +340,7 @@ public class DiffImpl implements Diff {
 
 	// 去重
 	public <T> List<T> getNewList(List<T> li) {
+		li = filterNull(li);
 		List<T> list = new ArrayList<T>();
 		for (int i = 0; i < li.size(); i++) {
 			T str = li.get(i); // 获取传入集合对象的每一个元素
@@ -359,17 +351,39 @@ public class DiffImpl implements Diff {
 		return list; // 返回集合
 	}
 
-	public static <T> List<T> minusList(List<T> src, List<T> deleted) {
-		List<T> list = new ArrayList<T>(src);
-		List<T> list2 = new ArrayList<T>(deleted);
-		for (int i = 0; i < list2.size(); i++) {
-			T str = list2.get(i); // 获取传入集合对象的每一个元素
-			if (list.contains(str)) { // 查看新集合中是否有指定的元素，如果没有则加入
-				list.remove(str);
-				list2.remove(str);
+	public static <T> int contains2(List<T> src, T str) {
+		for (T var : src) {
+			if (var.toString().equals(str.toString())) {
+				return src.indexOf(var);
+			}
+		}
+		return (-1);
+	}
+
+	public static <T> List<T> filterNull(List<T> list) {
+		for (int i = 0; i < list.size(); i++) {
+			if (list.get(i).toString().equals("")) {
+				list.remove(i);
 				i--;
 			}
 		}
+		return list;
+	}
+
+	public static <T> List<T> minusList(List<T> src, List<T> deleted) {
+		List<T> list = new ArrayList<T>(src);
+		System.out.println("src list: " + src.toString());
+		System.out.println("del list: " + deleted.toString());
+		List<T> list2 = new ArrayList<T>(deleted);
+		for (int i = 0; i < list2.size(); i++) {
+			T str = list2.get(i); // 获取传入集合对象的每一个元素
+			int index = contains2(list, str);
+			if (index != -1) { // 查看新集合中是否有指定的元素，如果没有则加入
+				list.remove(index);
+			}
+		}
+		list = filterNull(list);
+		System.out.println("remain list: " + list.toString());
 		return list; // 返回集合
 	}
 
@@ -515,28 +529,42 @@ public class DiffImpl implements Diff {
 		return 1 - (double) ld / Math.max(str1.length(), str2.length());
 	}
 
+	public static List<CtLiteral> filterNum(List<CtLiteral> con_literal) {
+		for (int i = 0; i < con_literal.size(); i++) {
+			if (!con_literal.get(i).toString().contains("\"")) {
+				con_literal.remove(i);
+				i--;
+			}
+		}
+		return con_literal;
+	}
+
 	public void print_file() {
 		// ---------------------------------------------Print
-		File file = new File("con_pos.csv");
+		File file = new File("con_pos1.csv");
 		CSVFormat format = null;
 		if (file.exists()) {
-			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal", "Src_Num_Invocation",
-					"Src_Num_If", "Src_Num_Conditional", "Src_Num_Switch", "Src_Num_Var_Ac", "Src_Num_Type_Ac",
-					"Src_Num_Field_Ac", "Src_Num_Assert", "Src_Num_Assign", "Src_Num_Typed_Ele", "Src_Num_Package",
-					"LOC_Extracted_Method", "Num_Variable", "Num_local", "Num_Literal", "Num_Invocation", "Num_If",
-					"Num_Conditional", "Num_Switch", "Num_Var_Ac", "Num_Type_Ac", "Num_Field_Ac", "Num_Assign",
-					"Num_Typed_Ele", "Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Field_Access",
-					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Package").withSkipHeaderRecord();
+			format = CSVFormat.DEFAULT
+					.withHeader("Con_LOC", "CON_LOCAL", "CON_LITERAL", "CON_INVOCATION", "CON_IF", "CON_CONDITIONAL",
+							"CON_SWITCH", "CON_VAR_ACC", "CON_TYPE_ACC", "CON_FIELD_ACC", "CON_ASSERT", "CON_ASSIGN",
+							"CON_TYPED_ELE", "CON_PACKAGE", "LOC_Extracted_Method", "Num_Variable", "Num_local",
+							"Num_Literal", "Num_Invocation", "Num_If", "Num_Conditional", "Num_Switch", "Num_Var_Ac",
+							"Num_Type_Ac", "Num_Field_Ac", "Num_Assign", "Num_Typed_Ele", "Num_Package", "ratio_LOC",
+							"Ratio_Variable_Access", "Ratio_Variable_Access2", "Ratio_Field_Access",
+							"Ratio_Field_Access2", "Ratio_Type_Access", "Ratio_Type_Access2", "Ratio_Typed_Ele",
+							"Ratio_Typed_Ele2", "Ratio_Package", "Ratio_Package2", "Coh_Pacakge")
+					.withSkipHeaderRecord();
 		} else {
-			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal", "Src_Num_Invocation",
-					"Src_Num_If", "Src_Num_Conditional", "Src_Num_Switch", "Src_Num_Var_Ac", "Src_Num_Type_Ac",
-					"Src_Num_Field_Ac", "Src_Num_Assert", "Src_Num_Assign", "Src_Num_Typed_Ele", "Src_Num_Package",
-					"LOC_Extracted_Method", "Num_Variable", "Num_local", "Num_Literal", "Num_Invocation", "Num_If",
-					"Num_Conditional", "Num_Switch", "Num_Var_Ac", "Num_Type_Ac", "Num_Field_Ac", "Num_Assign",
-					"Num_Typed_Ele", "Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Field_Access",
-					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Package");
+			format = CSVFormat.DEFAULT.withHeader("Con_LOC", "CON_LOCAL", "CON_LITERAL", "CON_INVOCATION", "CON_IF",
+					"CON_CONDITIONAL", "CON_SWITCH", "CON_VAR_ACC", "CON_TYPE_ACC", "CON_FIELD_ACC", "CON_ASSERT",
+					"CON_ASSIGN", "CON_TYPED_ELE", "CON_PACKAGE", "LOC_Extracted_Method", "Num_Variable", "Num_local",
+					"Num_Literal", "Num_Invocation", "Num_If", "Num_Conditional", "Num_Switch", "Num_Var_Ac",
+					"Num_Type_Ac", "Num_Field_Ac", "Num_Assign", "Num_Typed_Ele", "Num_Package", "ratio_LOC",
+					"Ratio_Variable_Access", "Ratio_Variable_Access2", "Ratio_Field_Access", "Ratio_Field_Access2",
+					"Ratio_Type_Access", "Ratio_Type_Access2", "Ratio_Typed_Ele", "Ratio_Typed_Ele2", "Ratio_Package",
+					"Ratio_Package2", "Coh_Pacakge");
 		}
-		try (Writer out = new FileWriter("con_pos.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
+		try (Writer out = new FileWriter("con_pos1.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
 			System.out.println("--------------source method----------------" + sourceMethod.size());
 			for (int w = 0; w < sourceMethod.size(); w++) {
 				// get the body of source method: blk
@@ -560,58 +588,88 @@ public class DiffImpl implements Diff {
 				}
 
 				// F1 metrics (context)
+				// LOC of source mtd
 				int LOC_Src = getLOC(blk);
+				// LOC of extracted mtd
 				LOC_Extracted_Method = getLOC(extracted_Method.getBody());
-				int Src_LOC = LOC_Src - LOC_Extracted_Method;
-				if (Src_LOC < 0) {
-					Src_LOC = 0;
-				}
-				int Src_Num_Variable = blk2.getElements(new TypeFilter(CtVariable.class)).size();
-				int Src_Num_local = blk2.getElements(new TypeFilter(CtLocalVariable.class)).size();
-				int Src_Num_Literal = blk2.getElements(new TypeFilter(CtLiteral.class)).size();
-				System.out.println("lit: " + blk2.getElements(new TypeFilter(CtLiteral.class)));
-				if (Src_Num_Literal > 0) {
-					Src_Num_Literal = 1;
-				}
-				int Src_Num_Assert = blk2.getElements(new TypeFilter(CtAssert.class)).size();
-				int Src_Num_Com = blk2.getElements(new TypeFilter(CtComment.class)).size();
-				int Src_Num_Invocation = blk2.getElements(new TypeFilter(CtInvocation.class)).size();
-				int Src_Num_Executable = blk2.getElements(new TypeFilter(CtExecutable.class)).size();
-				int Src_Num_ExeRefExp = blk2.getElements(new TypeFilter(CtExecutableReferenceExpression.class)).size();
-				int Src_Num_If = blk2.getElements(new TypeFilter(CtIf.class)).size();
-				int Src_Num_Conditional = blk2.getElements(new TypeFilter(CtConditional.class)).size();
-				int Src_Num_Switch = blk2.getElements(new TypeFilter(CtSwitch.class)).size();
-				int Src_Num_Var_Ac = blk2.getElements(new TypeFilter(CtVariableAccess.class)).size();
-				int Src_Num_Type_Ac = blk2.getElements(new TypeFilter(CtTypeAccess.class)).size();
-				int Src_Num_Field_Ac = blk2.getElements(new TypeFilter(CtFieldAccess.class)).size();
-				int Src_Num_Assign = blk2.getElements(new TypeFilter(CtAssignment.class)).size();
-				int Src_Num_Typed_Ele = blk2.getElements(new TypeFilter(CtTypedElement.class)).size();
-				int Src_Num_Package = blk2.getElements(new TypeFilter(CtPackageReferenceImpl.class)).size();
+				// LOC of context
+				System.out.println("loc src: " + LOC_Src);
+				System.out.println("loc ext: " + LOC_Extracted_Method);
+				int Con_LOC = (LOC_Src - LOC_Extracted_Method) > 0 ? (LOC_Src - LOC_Extracted_Method) : 0;
+				List<CtLocalVariable> con_local = blk2.getElements(new TypeFilter(CtLocalVariable.class));
+				con_local = filterNull(con_local);
+				int CON_LOCAL = con_local.size();
 
+				List<CtLiteral> con_literal = blk2.getElements(new TypeFilter(CtLiteral.class));
+				con_literal = filterNull(con_literal);
+				con_literal = filterNum(con_literal);
+				int CON_LITERAL = con_literal.size() > 0 ? 1 : 0;
+
+				List<CtAssert> con_assert = blk2.getElements(new TypeFilter(CtAssert.class));
+				con_assert = filterNull(con_assert);
+				int CON_ASSERT = con_assert.size();
+
+				List<CtInvocation> con_invo = blk2.getElements(new TypeFilter(CtInvocation.class));
+				con_invo = filterNull(con_invo);
+				int CON_INVOCATION = con_invo.size();
+
+				List<CtIf> con_if = blk2.getElements(new TypeFilter(CtIf.class));
+				con_if = filterNull(con_if);
+				int CON_IF = con_if.size();
+
+				List<CtConditional> con_conditional = blk2.getElements(new TypeFilter(CtConditional.class));
+				con_conditional = filterNull(con_conditional);
+				int CON_CONDITIONAL = con_conditional.size();
+
+				List<CtSwitch> con_switch = blk2.getElements(new TypeFilter(CtSwitch.class));
+				con_switch = filterNull(con_switch);
+				int CON_SWITCH = con_switch.size();
+
+				List<CtVariableAccess> con_var_access = blk2.getElements(new TypeFilter(CtVariableAccess.class));
+				con_var_access = filterNull(con_var_access);
+				int CON_VAR_ACC = con_var_access.size();
+
+				List<CtTypeAccess> con_type_access = blk2.getElements(new TypeFilter(CtTypeAccess.class));
+				con_type_access = filterNull(con_type_access);
+				int CON_TYPE_ACC = con_type_access.size();
+
+				List<CtFieldAccess> con_field_access = blk2.getElements(new TypeFilter(CtFieldAccess.class));
+				con_field_access = filterNull(con_field_access);
+				int CON_FIELD_ACC = con_field_access.size();
+
+				List<CtAssignment> con_assign = blk2.getElements(new TypeFilter(CtAssignment.class));
+				con_assign = filterNull(con_assign);
+				int CON_ASSIGN = con_assign.size();
+
+				List<CtTypedElement> con_typed_ele = blk2.getElements(new TypeFilter(CtTypedElement.class));
+				con_typed_ele = filterNull(con_typed_ele);
+				int CON_TYPED_ELE = con_typed_ele.size();
+
+				List<CtPackageReferenceImpl> con_package = blk2
+						.getElements(new TypeFilter(CtPackageReferenceImpl.class));
+				con_package = filterNull(con_package);
+				int CON_PACKAGE = con_package.size();
+
+				double[] temp_result = new double[2];
+				temp_result[0] = temp_result[1] = 0;
 				double ratio_LOC = 0;
 				// F2 metrics
-				if (LOC_Src > 0) {
-					ratio_LOC = LOC_Extracted_Method / (double) LOC_Src;
-				}
 				// variable
-				Num_Variable = deleted.getElements(new TypeFilter(CtVariable.class)).size();
-				Num_local = deleted.getElements(new TypeFilter(CtLocalVariable.class)).size();
+				Num_Variable = filterNull(deleted.getElements(new TypeFilter(CtVariable.class))).size();
+				Num_local = filterNull(deleted.getElements(new TypeFilter(CtLocalVariable.class))).size();
 				// Literal
-				Num_Literal = deleted.getElements(new TypeFilter(CtLiteral.class)).size();
-				if (Num_Literal > 0) {
-					Num_Literal = 1;
-				}
+				Num_Literal = filterNull(deleted.getElements(new TypeFilter(CtLiteral.class))).size() > 0 ? 1 : 0;
 				// Invocation
-				Num_Invocation = deleted.getElements(new TypeFilter(CtInvocation.class)).size();
+				Num_Invocation = filterNull(deleted.getElements(new TypeFilter(CtInvocation.class))).size();
 				// Structure
-				Num_If = deleted.getElements(new TypeFilter(CtIf.class)).size();
-				Num_Conditional = deleted.getElements(new TypeFilter(CtConditional.class)).size();
-				Num_Switch = deleted.getElements(new TypeFilter(CtSwitch.class)).size();
+				Num_If = filterNull(deleted.getElements(new TypeFilter(CtIf.class))).size();
+				Num_Conditional = filterNull(deleted.getElements(new TypeFilter(CtConditional.class))).size();
+				Num_Switch = filterNull(deleted.getElements(new TypeFilter(CtSwitch.class))).size();
 				// Access
-				Num_Var_Ac = deleted.getElements(new TypeFilter(CtVariableAccess.class)).size();
-				Num_Type_Ac = deleted.getElements(new TypeFilter(CtTypeAccess.class)).size();
-				Num_Field_Ac = deleted.getElements(new TypeFilter(CtFieldAccess.class)).size();
-				Num_Assign = deleted.getElements(new TypeFilter(CtAssignment.class)).size();
+				Num_Var_Ac = filterNull(deleted.getElements(new TypeFilter(CtVariableAccess.class))).size();
+				Num_Type_Ac = filterNull(deleted.getElements(new TypeFilter(CtTypeAccess.class))).size();
+				Num_Field_Ac = filterNull(deleted.getElements(new TypeFilter(CtFieldAccess.class))).size();
+				Num_Assign = filterNull(deleted.getElements(new TypeFilter(CtAssignment.class))).size();
 
 				// F3 the ratio of frequency of variable access in the deleted
 				// part to that in src
@@ -619,28 +677,36 @@ public class DiffImpl implements Diff {
 						deleted.getElements(new TypeFilter(CtVariableAccess.class)));
 				srcVarAcc = new ArrayList<CtVariableAccess>(blk.getElements(new TypeFilter(CtVariableAccess.class)));
 				System.out.println("Variable Access that almost only used in the deleted part is: ");
-				double Ratio_Variable_Access = ratio_u(delVarAcc, srcVarAcc, variable_access_most_used);
+				double Ratio_Variable_Access = ratio_u(temp_result, delVarAcc, srcVarAcc, variable_access_most_used);
+				double Ratio_Variable_Access2 = temp_result[1];
 
 				// F3 the ratio of frequency of field access in the deleted part
 				// to that in src
 				delFieldAcc = new ArrayList<CtFieldAccess>(deleted.getElements(new TypeFilter(CtFieldAccess.class)));
 				srcFieldAcc = new ArrayList<CtFieldAccess>(blk.getElements(new TypeFilter(CtFieldAccess.class)));
 				System.out.println("Field Access that almost only used in the deleted part is: ");
-				double Ratio_Field_Access = ratio_u(delFieldAcc, srcFieldAcc, field_access_most_used);
+				double Ratio_Field_Access = ratio_u(temp_result, delFieldAcc, srcFieldAcc, field_access_most_used);
+				double Ratio_Field_Access2 = temp_result[1];
 
 				// F3 the ratio of frequency of invocation in the deleted part
 				// to that in src
+				if (LOC_Src > 0) {
+					ratio_LOC = LOC_Extracted_Method / (double) LOC_Src;
+				}
+
 				delInvo = new ArrayList<CtInvocation>(deleted.getElements(new TypeFilter(CtInvocation.class)));
 				srcInvo = new ArrayList<CtInvocation>(blk.getElements(new TypeFilter(CtInvocation.class)));
 				System.out.println("Invocation that almost only used in the deleted part is: ");
-				double Ratio_Invocation = ratio_u(delInvo, srcInvo, invocation_most_used);
+				double Ratio_Invocation = ratio_u(temp_result, delInvo, srcInvo, invocation_most_used);
+				double Ratio_Invocation2 = temp_result[1];
 
 				// F3 the ratio of frequency of type access in the deleted part
 				// to that in src
 				delTypeAcc = new ArrayList<CtTypeAccess>(deleted.getElements(new TypeFilter(CtTypeAccess.class)));
 				srcTypeAcc = new ArrayList<CtTypeAccess>(blk.getElements(new TypeFilter(CtTypeAccess.class)));
 				System.out.println("Type Access that almost only used in the deleted part is: ");
-				double Ratio_Type_Access = ratio_u(delTypeAcc, srcTypeAcc, type_access_most_used);
+				double Ratio_Type_Access = ratio_u(temp_result, delTypeAcc, srcTypeAcc, type_access_most_used);
+				double Ratio_Type_Access2 = temp_result[1];
 
 				// F3 the ratio of frequency of typed element in the deleted
 				// part to that in src
@@ -648,7 +714,8 @@ public class DiffImpl implements Diff {
 				srcTypedEle = new ArrayList<CtTypedElement>(blk.getElements(new TypeFilter(CtTypedElement.class)));
 				System.out.println("Typed element that almost only used in the deleted part is: ");
 				int Num_Typed_Ele = delTypedEle.size();
-				double Ratio_Typed_Ele = ratio_u(delTypedEle, srcTypedEle, typed_ele_most_used);
+				double Ratio_Typed_Ele = ratio_u(temp_result, delTypedEle, srcTypedEle, typed_ele_most_used);
+				double Ratio_Typed_Ele2 = temp_result[1];
 
 				// F3 the ratio of frequency of packages in the deleted part to
 				// that in src
@@ -658,17 +725,28 @@ public class DiffImpl implements Diff {
 						blk.getElements(new TypeFilter(CtPackageReferenceImpl.class)));
 				int Num_Package = delPackage.size();
 				System.out.println("Package that almost only used in the deleted part is: ");
-				double Ratio_Package = ratio(delPackage, srcPackage, package_most_used);
+				double Ratio_Package = ratio(temp_result, delPackage, srcPackage, package_most_used);
+				double Ratio_Package2 = temp_result[1];
+
+				// Cohesion of Package
+				double Coh_Pacakge = 0;
+				if (LOC_Extracted_Method > 0) {
+					Coh_Pacakge = Ratio_Package / (double) LOC_Extracted_Method;
+				}
+
 				// Print
-				if (Src_LOC > 0) {
-					printer.printRecord(Src_LOC, Src_Num_local, Src_Num_Literal, Src_Num_Invocation, Src_Num_If,
-							Src_Num_Conditional, Src_Num_Switch, Src_Num_Var_Ac, Src_Num_Type_Ac, Src_Num_Field_Ac,
-							Src_Num_Assert, Src_Num_Assign, Src_Num_Typed_Ele, Src_Num_Package, LOC_Extracted_Method,
-							Num_Variable, Num_local, Num_Literal, Num_Invocation, Num_If, Num_Conditional, Num_Switch,
-							Num_Var_Ac, Num_Type_Ac, Num_Field_Ac, Num_Assign, Num_Typed_Ele, Num_Package, ratio_LOC,
-							Ratio_Variable_Access, Ratio_Field_Access, Ratio_Type_Access, Ratio_Typed_Ele,
-							Ratio_Package);
+				if (Con_LOC > 0) {
+					System.out.println("print@@");
+					printer.printRecord(Con_LOC, CON_LOCAL, CON_LITERAL, CON_INVOCATION, CON_IF, CON_CONDITIONAL,
+							CON_SWITCH, CON_VAR_ACC, CON_TYPE_ACC, CON_FIELD_ACC, CON_ASSERT, CON_ASSIGN, CON_TYPED_ELE,
+							CON_PACKAGE, LOC_Extracted_Method, Num_Variable, Num_local, Num_Literal, Num_Invocation,
+							Num_If, Num_Conditional, Num_Switch, Num_Var_Ac, Num_Type_Ac, Num_Field_Ac, Num_Assign,
+							Num_Typed_Ele, Num_Package, ratio_LOC, Ratio_Variable_Access, Ratio_Variable_Access2,
+							Ratio_Field_Access, Ratio_Field_Access2, Ratio_Type_Access, Ratio_Type_Access2,
+							Ratio_Typed_Ele, Ratio_Typed_Ele2, Ratio_Package, Ratio_Package2, Coh_Pacakge);
 					printer.flush();
+				} else {
+					System.out.println("extract the whole thing!");
 				}
 			}
 			printer.close();
@@ -679,13 +757,19 @@ public class DiffImpl implements Diff {
 
 	private int getLOC(CtBlock cblk) {
 		// TODO get lines of code
-		int start = cblk.getStatement(0).getPosition().getLine();
-		int getEndLine = cblk.getLastStatement().getPosition().getEndLine();
-		return (getEndLine - start + 1);
+		int lines = 0;
+		String blk = cblk.toString();
+		char[] ch = blk.toCharArray();
+		for (int i = 0; i < ch.length; i++) {
+			if (ch[i] == '\n') {
+				lines++;
+			}
+		}
+		return lines;
 	}
 
-	private double ratio(List<CtPackageReferenceImpl> delPackage, List<CtPackageReferenceImpl> srcPackage,
-			CtPackageReferenceImpl pkg) {
+	private double ratio(double[] ratio, List<CtPackageReferenceImpl> delPackage,
+			List<CtPackageReferenceImpl> srcPackage, CtPackageReferenceImpl pkg) {
 		// TODO Auto-generated method stub
 		List<CtPackageReferenceImpl> parPackage = new ArrayList<CtPackageReferenceImpl>();
 		for (int p = 0; p < extracted_Method.getParameters().size(); p++) {
@@ -699,11 +783,10 @@ public class DiffImpl implements Diff {
 		for (int l = 0; l < delPackage2.size(); l++) {
 			CtPackageReferenceImpl tem = delPackage2.get(l);
 			if (parPackage.contains(tem)) {
-				delPackage2.remove(tem);
+				delPackage2.remove(delPackage2.indexOf(tem));
 				l--;
 			}
 		}
-		System.out.println("------CtDelPackageReferenceImpl---------++" + delPackage2);
 		int num1, num2;
 		CtPackageReferenceImpl temp;
 		int size = delPackage2.size();
@@ -719,29 +802,32 @@ public class DiffImpl implements Diff {
 			}
 		}
 		double result = 0;
+		double result2 = 0;
 		int index = -1;
 		for (int j = 0; j < size; j++) {
 			if (all_ratios[j] > result) {
 				index = j;
+				result2 = result;
 				result = all_ratios[j];
 			}
 		}
 		if (index == -1) {
 			System.out.println("No package used in the code");
 		} else {
-			System.out.println(" " + delPackage2.get(index));
+			System.out.println("the most used package: " + delPackage2.get(index));
 			pkg = delPackage2.get(index);
 		}
 		if (result > 1) {
 			result = 1;
 		}
+		ratio[0] = result;
+		ratio[1] = result2;
 		return result;
 	}
 
-	private <T> double ratio_u(List<T> delPackage, List<T> srcPackage, T pkg) {
+	private <T> double ratio_u(double[] ratio, List<T> delPackage, List<T> srcPackage, T pkg) {
 		// TODO Auto-generated method stub
 		List<T> delPackage2 = getNewList(delPackage);
-		System.out.println("------CtDel***Impl---------++" + delPackage2);
 		int num1, num2;
 		T temp;
 		int size = delPackage2.size();
@@ -757,22 +843,26 @@ public class DiffImpl implements Diff {
 			}
 		}
 		double result = 0;
+		double result2 = 0;
 		int index = -1;
 		for (int j = 0; j < size; j++) {
 			if (all_ratios[j] > result) {
 				index = j;
+				result2 = result;
 				result = all_ratios[j];
 			}
 		}
 		if (index == -1) {
 			System.out.println("Nothing used in the code");
 		} else {
-			System.out.println(" " + delPackage2.get(index));
+			System.out.println("the most used element: " + delPackage2.get(index));
 			pkg = delPackage2.get(index);
 		}
 		if (result > 1) {
 			result = 1;
 		}
+		ratio[0] = result;
+		ratio[1] = result2;
 		return result;
 	}
 

@@ -106,7 +106,6 @@ public class AstComparator {
 			System.out.println("Usage: DiffSpoon <file_1>  <file_2> <Extracted_Mtd_Name> <Src_Mtd_Name>");
 			return;
 		}
-
 		final Diff result = new AstComparator().compare(new File(args[0]), new File(args[1]), args[2], args[3]);
 		System.out.println(result.toString());
 	}
