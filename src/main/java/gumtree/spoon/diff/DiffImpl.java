@@ -186,6 +186,8 @@ public class DiffImpl implements Diff {
 
 	public DiffImpl(TreeContext context, ITree rootSpoonLeft, ITree rootSpoonRight, String Extracted_Mtd,
 			String Src_Mtd) {
+		CtElement all = (CtElement) rootSpoonRight.getChild(0).getMetadata((SpoonGumTreeBuilder.SPOON_OBJECT));
+		System.out.println("right: " + all.getElements(new TypeFilter(CtMethod.class)));
 		final MappingStore mappingsComp = new MappingStore();
 
 		final Matcher matcher = new CompositeMatchers.ClassicGumtree(rootSpoonLeft, rootSpoonRight, mappingsComp);
@@ -903,6 +905,7 @@ public class DiffImpl implements Diff {
 
 				// action position
 				CtElement parent = element;
+				System.out.println(element.toString());
 				while (parent.getParent() != null && !(parent.getParent() instanceof CtPackage)) {
 					parent = parent.getParent();
 				}
@@ -1018,7 +1021,10 @@ public class DiffImpl implements Diff {
 				}
 				stringBuilder.append(position).append(newline);
 
-				String label = element.toString();
+				String label = null;
+				if (!element.equals(null)) {
+					label = element.toString();
+				}
 				if (action instanceof Update) {
 					CtElement callIt = element;
 					while (!(callIt instanceof CtMethod) && !(callIt instanceof CtConstructor)
