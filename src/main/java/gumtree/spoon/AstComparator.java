@@ -60,24 +60,26 @@ public class AstComparator {
 		factory.getEnvironment().setNoClasspath(true);
 	}
 
-	public Diff compare(File f1, File f2, String Extracted_Mtd, String Src_Mtd) throws Exception {
-		return this.compare(getCtType(f1), getCtType(f2), Extracted_Mtd, Src_Mtd);
+	public Diff compare(File f1, File f2, String Extracted_Mtd, String Src_Mtd, int params_E, int params_S)
+			throws Exception {
+		return this.compare(getCtType(f1), getCtType(f2), Extracted_Mtd, Src_Mtd, params_E, params_S);
 	}
 
 	/**
 	 * compares two snippet
 	 */
-	public Diff compare(String left, String right, String Extracted_Mtd, String Src_Mtd) {
-		return compare(getCtType(left), getCtType(right), Extracted_Mtd, Src_Mtd);
+	public Diff compare(String left, String right, String Extracted_Mtd, String Src_Mtd, int params_E, int params_S) {
+		return compare(getCtType(left), getCtType(right), Extracted_Mtd, Src_Mtd, params_E, params_S);
 	}
 
 	/**
 	 * compares two AST nodes
 	 */
-	public Diff compare(CtElement left, CtElement right, String Extracted_Mtd, String Src_Mtd) {
+	public Diff compare(CtElement left, CtElement right, String Extracted_Mtd, String Src_Mtd, int params_E,
+			int params_S) {
 		final SpoonGumTreeBuilder scanner = new SpoonGumTreeBuilder();
 		return new DiffImpl(scanner.getTreeContext(), scanner.getTree(left), scanner.getTree(right), Extracted_Mtd,
-				Src_Mtd);
+				Src_Mtd, params_E, params_S);
 	}
 
 	private CtType getCtType(File file) throws Exception {
@@ -89,7 +91,7 @@ public class AstComparator {
 		if (factory.Type().getAll().size() == 0) {
 			return null;
 		}
-
+		// return the 0th class in the java file
 		return factory.Type().getAll().get(0);
 	}
 
@@ -101,12 +103,14 @@ public class AstComparator {
 	}
 
 	public static void main(String[] args) throws Exception {
-		if (args.length != 4) {
+		if (args.length != 6) {
 			System.out.println(args.length);
-			System.out.println("Usage: DiffSpoon <file_1>  <file_2> <Extracted_Mtd_Name> <Src_Mtd_Name>");
+			System.out.println(
+					"Usage: DiffSpoon <file_1>  <file_2> <Extracted_Mtd_Name> <Src_Mtd_Name> <No. params in Extracted Method> <No. params in Source Method>");
 			return;
 		}
-		final Diff result = new AstComparator().compare(new File(args[0]), new File(args[1]), args[2], args[3]);
+		final Diff result = new AstComparator().compare(new File(args[0]), new File(args[1]), args[2], args[3],
+				Integer.parseInt(args[4]), Integer.parseInt(args[5]));
 		System.out.println(result.toString());
 	}
 }
