@@ -125,6 +125,7 @@ public class DiffImpl implements Diff {
 	String Returned_Type;
 	int Num_Parameters;
 	boolean flagtemp = false;
+	boolean noASTchange = false;
 	// metrics
 	int LOC_Extracted_Method;
 
@@ -503,25 +504,42 @@ public class DiffImpl implements Diff {
 
 	@Override
 	public String toString() {
+		String result;
 		if (rootOperations.size() == 0) {
-			return "no AST change";
-		}
-		final StringBuilder stringBuilder = new StringBuilder();
-		final CtElement ctElement = commonAncestor();
-		String temp = null;
-		for (Operation operation : rootOperations) {
-			try {
-				temp = toStringAction(operation.getAction());
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			CtBlock src_blk;
+			if (src_Method instanceof CtMethod) {
+				src_blk = ((CtMethod) call_Method).getBody().clone();
+				src_blk.addStatement(extracted_Code);
+				CtMethod source = (CtMethod) call_Method.clone();
+				source.setBody(src_blk);
+				src_Method = source;
+			} else if (src_Method instanceof CtConstructor) {
+				src_blk = ((CtConstructor) call_Method).getBody().clone();
+				src_blk.addStatement(extracted_Code);
+				CtConstructor source = (CtConstructor) call_Method.clone();
+				source.setBody(src_blk);
+				src_Method = source;
 			}
-			if (temp.length() > 0) {
-				stringBuilder.append(temp);
-				if (operation.getNode().equals(ctElement) && operation instanceof InsertOperation) {
-					break;
+			result = "no AST change";
+		} else {
+			final StringBuilder stringBuilder = new StringBuilder();
+			final CtElement ctElement = commonAncestor();
+			String temp = null;
+			for (Operation operation : rootOperations) {
+				try {
+					temp = toStringAction(operation.getAction());
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				if (temp.length() > 0) {
+					stringBuilder.append(temp);
+					if (operation.getNode().equals(ctElement) && operation instanceof InsertOperation) {
+						break;
+					}
 				}
 			}
+			result = stringBuilder.toString();
 		}
 		try {
 			print_after();
@@ -535,7 +553,7 @@ public class DiffImpl implements Diff {
 			e.printStackTrace();
 		}
 		print_file();
-		return stringBuilder.toString();
+		return result;
 	}
 
 	private static int min(int one, int two, int three) {
@@ -652,8 +670,9 @@ public class DiffImpl implements Diff {
 			int LOC_Src = getLOC(blk);
 			// LOC of extracted mtd
 			LOC_Extracted_Method = getLOC(extracted_Code);
+			int LOC_Call = getLOC(blk2);
 			// LOC of context
-			int Con_LOC = (LOC_Src - LOC_Extracted_Method) > 0 ? (LOC_Src - LOC_Extracted_Method) : 0;
+			int Con_LOC = (LOC_Call - 1) > 0 ? (LOC_Call - 1) : 0;
 			List<CtLocalVariable> con_local = blk2.getElements(new TypeFilter(CtLocalVariable.class));
 			con_local = filterNull(con_local);
 			int CON_LOCAL = con_local.size();
