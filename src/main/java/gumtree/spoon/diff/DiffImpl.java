@@ -185,7 +185,7 @@ public class DiffImpl implements Diff {
 	private int Num_Assign;
 
 	public DiffImpl(TreeContext context, ITree rootSpoonLeft, ITree rootSpoonRight, String Extracted_Mtd,
-			String Src_Mtd, int params_E, int params_S) {
+			String Src_Mtd) {
 		boolean flag1, flag2, flag3;
 		flag1 = flag2 = flag3 = false;
 		// get the new extracted method and the call method
@@ -196,11 +196,11 @@ public class DiffImpl implements Diff {
 		for (int i = 0; i < methods_after.size(); i++) {
 			CtMethod aMethod = methods_after.get(i);
 			String aName = aMethod.getSimpleName().toString();
-			if (aName.equals(Extracted_Mtd) && aMethod.getParameters().size() == params_E) {
+			if (aName.equals(Extracted_Mtd)) {
 				extracted_Method = aMethod.clone();
 				te++;
 			}
-			if (aName.equals(Src_Mtd) && aMethod.getParameters().size() == params_S) {
+			if (aName.equals(Src_Mtd)) {
 				call_Method = aMethod.clone();
 				te2++;
 			}
@@ -212,12 +212,10 @@ public class DiffImpl implements Diff {
 			for (int i = 0; i < methods_after.size(); i++) {
 				CtMethod aMethod = methods_after.get(i);
 				String aName = aMethod.getSimpleName().toString();
-				if (aName.equals(Extracted_Mtd) && aMethod.getParameters().size() == params_E
-						&& !aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
+				if (aName.equals(Extracted_Mtd) && !aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
 					extracted_Method = aMethod.clone();
 					flag1 = true;
-				} else if (aName.equals(Src_Mtd) && aMethod.getParameters().size() == params_S
-						&& aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
+				} else if (aName.equals(Src_Mtd) && aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
 					call_Method = aMethod.clone();
 					flag2 = true;
 				}
@@ -230,12 +228,10 @@ public class DiffImpl implements Diff {
 			for (int j = 0; j < con_after.size(); j++) {
 				CtConstructor aCon = con_after.get(j);
 				String aName = aCon.getSimpleName().toString();
-				if (aName.equals(Extracted_Mtd) && aCon.getParameters().size() == params_E
-						&& !aCon.getBody().toString().contains((Extracted_Mtd + "("))) {
+				if (aName.equals(Extracted_Mtd) && !aCon.getBody().toString().contains((Extracted_Mtd + "("))) {
 					flag1 = true;
 					extracted_Method = aCon.clone();
-				} else if (aName.equals(Src_Mtd) && aCon.getParameters().size() == params_S
-						&& aCon.getBody().toString().contains((Extracted_Mtd + "("))) {
+				} else if (aName.equals(Src_Mtd) && aCon.getBody().toString().contains((Extracted_Mtd + "("))) {
 					flag2 = true;
 					call_Method = aCon.clone();
 				}
@@ -247,7 +243,7 @@ public class DiffImpl implements Diff {
 		for (int i = 0; i < methods_before.size(); i++) {
 			CtMethod aMethod = methods_before.get(i);
 			String aName = aMethod.getSimpleName().toString();
-			if (aName.equals(Src_Mtd) && aMethod.getParameters().size() == params_S) {
+			if (aName.equals(Src_Mtd)) {
 				src_Method = aMethod.clone();
 				flag3 = true;
 				break;
@@ -258,7 +254,7 @@ public class DiffImpl implements Diff {
 			for (int j = 0; j < con_before.size(); j++) {
 				CtConstructor aCon = con_before.get(j);
 				String aName = aCon.getSimpleName().toString();
-				if (aName.equals(Src_Mtd) && aCon.getParameters().size() == params_S) {
+				if (aName.equals(Src_Mtd)) {
 					src_Method = aCon.clone();
 					flag3 = true;
 				}
