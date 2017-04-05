@@ -82,7 +82,7 @@ public class DiffImpl implements Diff {
 	CtElement extracted_Method; // extracted method
 	CtBlock extracted_Code;
 	CtElement call_Method;
-	CtElement src_Method;
+	CtElement src_Method = null;
 	CtElement deleted; // deleted code
 
 	// common variable declaration
@@ -191,19 +191,39 @@ public class DiffImpl implements Diff {
 		// get the new extracted method and the call method
 		CtElement all_after = (CtElement) rootSpoonRight.getChild(0).getMetadata((SpoonGumTreeBuilder.SPOON_OBJECT));
 		List<CtMethod> methods_after = all_after.getElements(new TypeFilter(CtMethod.class));
+		int te = 0;
+		int te2 = 0;
 		for (int i = 0; i < methods_after.size(); i++) {
 			CtMethod aMethod = methods_after.get(i);
 			String aName = aMethod.getSimpleName().toString();
-			if (aName.equals(Extracted_Mtd) && aMethod.getParameters().size() == params_E
-					&& !aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
+			if (aName.equals(Extracted_Mtd) && aMethod.getParameters().size() == params_E) {
 				extracted_Method = aMethod.clone();
-				flag1 = true;
-			} else if (aName.equals(Src_Mtd) && aMethod.getParameters().size() == params_S
-					&& aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
+				te++;
+			}
+			if (aName.equals(Src_Mtd) && aMethod.getParameters().size() == params_S) {
 				call_Method = aMethod.clone();
-				flag2 = true;
+				te2++;
 			}
 		}
+		if (te == 1 && te2 == 1) {
+			flag1 = true;
+			flag2 = true;
+		} else {
+			for (int i = 0; i < methods_after.size(); i++) {
+				CtMethod aMethod = methods_after.get(i);
+				String aName = aMethod.getSimpleName().toString();
+				if (aName.equals(Extracted_Mtd) && aMethod.getParameters().size() == params_E
+						&& !aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
+					extracted_Method = aMethod.clone();
+					flag1 = true;
+				} else if (aName.equals(Src_Mtd) && aMethod.getParameters().size() == params_S
+						&& aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
+					call_Method = aMethod.clone();
+					flag2 = true;
+				}
+			}
+		}
+
 		if (flag1 == false || flag2 == false) {
 			List<CtConstructor> con_after = all_after.getElements(new TypeFilter(CtConstructor.class));
 			System.out.println("cannot find extracted_Method or call method");
@@ -505,15 +525,15 @@ public class DiffImpl implements Diff {
 	@Override
 	public String toString() {
 		String result;
-		if (rootOperations.size() == 0) {
+		if (rootOperations.size() == 0 || src_Method == null) {
 			CtBlock src_blk;
-			if (src_Method instanceof CtMethod) {
+			if (call_Method instanceof CtMethod) {
 				src_blk = ((CtMethod) call_Method).getBody().clone();
 				src_blk.addStatement(extracted_Code);
 				CtMethod source = (CtMethod) call_Method.clone();
 				source.setBody(src_blk);
 				src_Method = source;
-			} else if (src_Method instanceof CtConstructor) {
+			} else if (call_Method instanceof CtConstructor) {
 				src_blk = ((CtConstructor) call_Method).getBody().clone();
 				src_blk.addStatement(extracted_Code);
 				CtConstructor source = (CtConstructor) call_Method.clone();
@@ -621,7 +641,7 @@ public class DiffImpl implements Diff {
 
 	public void print_file() {
 		// ---------------------------------------------Print
-		File file = new File("con_pos1.csv");
+		File file = new File("con_pos404.csv");
 		CSVFormat format = null;
 		if (file.exists()) {
 			format = CSVFormat.DEFAULT
@@ -644,7 +664,7 @@ public class DiffImpl implements Diff {
 					"Ratio_Field_Access2", "Ratio_Type_Access", "Ratio_Type_Access2", "Ratio_Typed_Ele",
 					"Ratio_Typed_Ele2", "Ratio_Package", "Ratio_Package2", "Coh_Pacakge");
 		}
-		try (Writer out = new FileWriter("con_pos1.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
+		try (Writer out = new FileWriter("con_pos404.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
 			// get the body of source method: blk
 			CtBlock blk = null;
 			if (src_Method instanceof CtMethod) {
@@ -672,7 +692,7 @@ public class DiffImpl implements Diff {
 			LOC_Extracted_Method = getLOC(extracted_Code);
 			int LOC_Call = getLOC(blk2);
 			// LOC of context
-			int Con_LOC = (LOC_Call - 1) > 0 ? (LOC_Call - 1) : 0;
+			int Con_LOC = (LOC_Call - 2) > 0 ? (LOC_Call - 2) : 0;
 			List<CtLocalVariable> con_local = blk2.getElements(new TypeFilter(CtLocalVariable.class));
 			con_local = filterNull(con_local);
 			int CON_LOCAL = con_local.size();
