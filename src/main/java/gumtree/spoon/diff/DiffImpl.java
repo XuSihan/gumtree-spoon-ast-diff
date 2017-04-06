@@ -11,10 +11,10 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
+
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 
-// import org.apache.log4j.Level;
 import com.github.gumtreediff.actions.ActionGenerator;
 import com.github.gumtreediff.actions.model.Action;
 import com.github.gumtreediff.actions.model.Delete;
@@ -37,22 +37,18 @@ import spoon.reflect.code.CtAssert;
 import spoon.reflect.code.CtAssignment;
 import spoon.reflect.code.CtBlock;
 import spoon.reflect.code.CtCodeSnippetStatement;
-import spoon.reflect.code.CtComment;
 import spoon.reflect.code.CtConditional;
-import spoon.reflect.code.CtExecutableReferenceExpression;
 import spoon.reflect.code.CtFieldAccess;
 import spoon.reflect.code.CtIf;
 import spoon.reflect.code.CtInvocation;
 import spoon.reflect.code.CtLiteral;
 import spoon.reflect.code.CtLocalVariable;
-// import spoon.reflect.code.CtStatement;
 import spoon.reflect.code.CtSwitch;
 import spoon.reflect.code.CtTypeAccess;
 import spoon.reflect.code.CtVariableAccess;
 import spoon.reflect.declaration.CtClass;
 import spoon.reflect.declaration.CtConstructor;
 import spoon.reflect.declaration.CtElement;
-import spoon.reflect.declaration.CtExecutable;
 import spoon.reflect.declaration.CtMethod;
 import spoon.reflect.declaration.CtModifiable;
 import spoon.reflect.declaration.CtPackage;
@@ -61,13 +57,11 @@ import spoon.reflect.declaration.CtType;
 import spoon.reflect.declaration.CtTypedElement;
 import spoon.reflect.declaration.CtVariable;
 import spoon.reflect.factory.Factory;
-// import spoon.reflect.factory.Factory;
 import spoon.reflect.factory.FactoryImpl;
 import spoon.reflect.visitor.filter.TypeFilter;
 import spoon.support.DefaultCoreFactory;
 import spoon.support.StandardEnvironment;
 import spoon.support.reflect.reference.CtPackageReferenceImpl;
-// import spoon.reflect.factory.CodeFactory;;;
 
 /**
  * @author Matias Martinez, matias.martinez@inria.fr
@@ -90,16 +84,13 @@ public class DiffImpl implements Diff {
 	CtTypedElement typed_ele_most_used;
 	CtModifiable modifiable_most_used;
 
-	List<CtElement> callMethod = new ArrayList<CtElement>(); // after
-																// version里的source
-																// method
-	List<CtElement> sourceMethod = new ArrayList<CtElement>(); // before
-																// version里的source
-																// method
 	List<CtElement> deleteStuff = new ArrayList<CtElement>(); // before
 																// version里source
 																// method被delete的code
-	CtMethod extracted_Method; // extracted method
+	CtElement extracted_Method; // extracted method
+	CtBlock extracted_Code;
+	CtElement call_Method;
+	CtElement src_Method = null;
 	CtElement deleted; // deleted code
 
 	// common variable declaration
@@ -203,6 +194,90 @@ public class DiffImpl implements Diff {
 
 	public DiffImpl(TreeContext context, ITree rootSpoonLeft, ITree rootSpoonRight, String Extracted_Mtd,
 			String Src_Mtd) {
+		boolean flag1, flag2, flag3;
+		flag1 = flag2 = flag3 = false;
+		// get the new extracted method and the call method
+		CtElement all_after = (CtElement) rootSpoonRight.getChild(0).getMetadata((SpoonGumTreeBuilder.SPOON_OBJECT));
+		List<CtMethod> methods_after = all_after.getElements(new TypeFilter(CtMethod.class));
+		int te = 0;
+		int te2 = 0;
+		for (int i = 0; i < methods_after.size(); i++) {
+			CtMethod aMethod = methods_after.get(i);
+			String aName = aMethod.getSimpleName().toString();
+			if (aName.equals(Extracted_Mtd)) {
+				extracted_Method = aMethod.clone();
+				te++;
+			}
+			if (aName.equals(Src_Mtd)) {
+				call_Method = aMethod.clone();
+				te2++;
+			}
+		}
+		if (te == 1 && te2 == 1) {
+			flag1 = true;
+			flag2 = true;
+		} else {
+			for (int i = 0; i < methods_after.size(); i++) {
+				CtMethod aMethod = methods_after.get(i);
+				String aName = aMethod.getSimpleName().toString();
+				if (aName.equals(Extracted_Mtd) && !aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
+					extracted_Method = aMethod.clone();
+					flag1 = true;
+				}
+				if (aName.equals(Src_Mtd) && aMethod.getBody().toString().contains((Extracted_Mtd + "("))) {
+					call_Method = aMethod.clone();
+					flag2 = true;
+				}
+			}
+		}
+
+		if (flag1 == false || flag2 == false) {
+			List<CtConstructor> con_after = all_after.getElements(new TypeFilter(CtConstructor.class));
+			System.out.println("cannot find extracted_Method or call method");
+			for (int j = 0; j < con_after.size(); j++) {
+				CtConstructor aCon = con_after.get(j);
+				String aName = aCon.getSimpleName().toString();
+				if (aName.equals(Extracted_Mtd) && !aCon.getBody().toString().contains((Extracted_Mtd + "("))) {
+					flag1 = true;
+					extracted_Method = aCon.clone();
+				} else if (aName.equals(Src_Mtd) && aCon.getBody().toString().contains((Extracted_Mtd + "("))) {
+					flag2 = true;
+					call_Method = aCon.clone();
+				}
+			}
+		}
+		// get the source method
+		CtElement all_before = (CtElement) rootSpoonLeft.getChild(0).getMetadata((SpoonGumTreeBuilder.SPOON_OBJECT));
+		List<CtMethod> methods_before = all_before.getElements(new TypeFilter(CtMethod.class));
+		for (int i = 0; i < methods_before.size(); i++) {
+			CtMethod aMethod = methods_before.get(i);
+			String aName = aMethod.getSimpleName().toString();
+			if (aName.equals(Src_Mtd)) {
+				src_Method = aMethod.clone();
+				flag3 = true;
+				break;
+			}
+		}
+		if (flag3 == false) {
+			List<CtConstructor> con_before = all_before.getElements(new TypeFilter(CtConstructor.class));
+			for (int j = 0; j < con_before.size(); j++) {
+				CtConstructor aCon = con_before.get(j);
+				String aName = aCon.getSimpleName().toString();
+				if (aName.equals(Src_Mtd)) {
+					src_Method = aCon.clone();
+					flag3 = true;
+				}
+			}
+		}
+		if (flag1 == false) {
+			System.out.println(Extracted_Mtd + ": cannot find extracted_Method method");
+		}
+		if (flag2 == false) {
+			System.out.println(Extracted_Mtd + ": cannot find call_Method method");
+		}
+		if (flag3 == false) {
+			System.out.println(Extracted_Mtd + ": cannot find src_Method method");
+		}
 		final MappingStore mappingsComp = new MappingStore();
 
 		final Matcher matcher = new CompositeMatchers.ClassicGumtree(rootSpoonLeft, rootSpoonRight, mappingsComp);
@@ -220,6 +295,11 @@ public class DiffImpl implements Diff {
 		this.context = context;
 		this.Name_Ext_Mtd = Extracted_Mtd;
 		this.Name_Src_Mtd = Src_Mtd;
+		if (extracted_Method instanceof CtMethod) {
+			extracted_Code = ((CtMethod) extracted_Method).getBody();
+		} else if (extracted_Method instanceof CtConstructor) {
+			extracted_Code = ((CtConstructor) extracted_Method).getBody();
+		}
 	}
 
 	private List<Operation> convertToSpoon(List<Action> actions) {
@@ -370,8 +450,6 @@ public class DiffImpl implements Diff {
 	public static <T> List<T> minusList(List<T> src, List<T> deleted) {
 		List<T> list = new ArrayList<T>(src);
 		List<T> list2 = new ArrayList<T>(deleted);
-		System.out.println("copy src: " + list.toString());
-		System.out.println("copy deleted: " + list2.toString());
 		for (int i = 0; i < list2.size(); i++) {
 			T str = list2.get(i); // 获取传入集合对象的每一个元素
 			if (list.contains(str)) { // 查看新集合中是否有指定的元素，如果没有则加入
@@ -380,96 +458,40 @@ public class DiffImpl implements Diff {
 				i--;
 			}
 		}
+		list = filterNull(list);
 		return list; // 返回集合
 	}
 
-	public void print_after() throws IOException {
-		File file_after = new File("after_method");
-		file_after.createNewFile();
-		FileWriter fileWriter = new FileWriter(file_after);
-		fileWriter.write("------------------Extracted method---------------------" + "\n" + "\n"
-				+ extracted_Method.toString() + "\n" + "\n"
-				+ "-------------------Methods who call it--------------------" + callMethod.size() + "\n" + "\n");
-		callMethod = getNewList(callMethod); // 去重
-		int size = callMethod.size();
-		System.out.println("--------------call method----------------" + callMethod.size());
-		for (int i = 0; i < size; i++) {
-			fileWriter.write(callMethod.get(i).toString() + "\n" + "\n");
-		}
-		fileWriter.write("--------------------------end------------------------------" + "\n");
-		fileWriter.close();
-	}
-
+	// public void print_after() throws IOException {
+	// 	File file_after = new File("after_method");
+	// 	file_after.createNewFile();
+	// 	FileWriter fileWriter = new FileWriter(file_after);
+	// 	fileWriter.write(
+	// 			"------------------Extracted method---------------------" + "\n" + "\n" + extracted_Method.toString()
+	// 					+ "\n" + "\n" + "-------------------Methods who call it--------------------" + "\n" + "\n"
+	// 					+ call_Method.toString() + "\n" + "\n");
+	// 	fileWriter.write("--------------------------end------------------------------" + "\n");
+	// 	fileWriter.close();
+	// }
 	public void print_before() throws IOException {
-		int size3 = deleteStuff.size();
-		int t;
-		double sim1, sim2;
-		sim1 = 0;
-		sim2 = 0;
-		CtElement tempEl;
-		for (t = 0; t < size3; t++) {
-			tempEl = deleteStuff.get(t);
-			sim2 = sim(tempEl.toString(), extracted_Method.getBody().toString());
-			System.out.println("the code is: " + tempEl.toString() + "the similarity of this stuff is: " + sim2);
-			if (sim2 > sim1) {
-				deleted = tempEl;
-				sim1 = sim2;
-			}
-		}
-		if (size3 == 0 || sim(deleted.toString(), extracted_Method.getBody().toString()) < 0.6) {
-			deleted = extracted_Method.getBody();
-			System.out.println("use extracted method directly");
-		}
 		File file_before = new File("before_method");
 		file_before.createNewFile();
 		FileWriter fileWriter2 = new FileWriter(file_before);
-		fileWriter2.write("-----------------------Extracted Part---------------------" + "\n" + "\n"
-				+ deleted.toString() + "\n" + "\n");
 		fileWriter2.write("--------------------------Source Methods------------------------------" + "\n" + "\n");
-		sourceMethod = getNewList(sourceMethod); // 去重
-		int size = sourceMethod.size();
-		for (int i = 0; i < size; i++) {
-			fileWriter2.write(sourceMethod.get(i).toString() + "\n" + "\n");
-		}
+		fileWriter2.write(src_Method.toString() + "\n" + "\n");
 		fileWriter2.write("--------------------------end-----------------------------" + "\n" + "\n");
 		fileWriter2.close();
 	}
 
 	@Override
 	public String toString() {
-		if (rootOperations.size() == 0) {
-			return "no AST change";
-		}
-		final StringBuilder stringBuilder = new StringBuilder();
-		final CtElement ctElement = commonAncestor();
-		String temp = null;
-		for (Operation operation : rootOperations) {
-			try {
-				temp = toStringAction(operation.getAction());
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			if (temp.length() > 0) {
-				stringBuilder.append(temp);
-				if (operation.getNode().equals(ctElement) && operation instanceof InsertOperation) {
-					break;
-				}
-			}
-		}
-		try {
-			print_after();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
 		try {
 			print_before();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		print_file();
-		return stringBuilder.toString();
+		return "hello";
 	}
 
 	private static int min(int one, int two, int three) {
@@ -525,196 +547,250 @@ public class DiffImpl implements Diff {
 		return 1 - (double) ld / Math.max(str1.length(), str2.length());
 	}
 
+	public static <T> List<T> filterNull(List<T> list) {
+		for (int i = 0; i < list.size(); i++) {
+			if (list.get(i).toString().equals("")) {
+				list.remove(i);
+				i--;
+			}
+		}
+		return list;
+	}
+
+	public static List<CtLiteral> filterNum(List<CtLiteral> con_literal) {
+		for (int i = 0; i < con_literal.size(); i++) {
+			if (!con_literal.get(i).toString().contains("\"")) {
+				con_literal.remove(i);
+				i--;
+			}
+		}
+		return con_literal;
+	}
+
+	private List<CtBlock> getAllCandi(CtBlock blk) {
+		// 随机选一个block，并随机选择其中的几个相邻的语句
+		// 生成一个空的block lists
+		List<CtBlock> candidates = new ArrayList<CtBlock>();
+		int i = 0;
+		// 获取全部的blocks
+		List<CtBlock> all_blocks = blk.getElements(new TypeFilter(CtBlock.class));
+		for (int j = 0; j < all_blocks.size(); j++) {
+			CtBlock temp = all_blocks.get(j);
+			int blk_size = temp.getStatements().size();
+			for (int z = 0; z < blk_size; z++) {
+				for (int y = z; y < blk_size; y++) {
+					CtBlock cblk = newBlock(blk);
+					for (int q = z; q <= y; q++) {
+						cblk.addStatement(temp.getStatement(q));
+					}
+					candidates.add(cblk);
+					i++;
+					System.out.println("cblk" + i + ": " + cblk.toString());
+				}
+			}
+		}
+		return candidates;
+	}
+
 	public void print_file() {
 		// ---------------------------------------------Print
-		File file = new File("con_neg.csv");
+		File file = new File("candidates404.csv");
 		CSVFormat format = null;
 		if (file.exists()) {
-			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal", "Src_Num_Invocation",
-					"Src_Num_If", "Src_Num_Conditional", "Src_Num_Switch", "Src_Num_Var_Ac", "Src_Num_Type_Ac",
-					"Src_Num_Field_Ac", "Src_Num_Assert", "Src_Num_Assign", "Src_Num_Typed_Ele", "Src_Num_Package",
-					"LOC_Extracted_Method", "Num_Variable", "Num_local", "Num_Literal", "Num_Invocation", "Num_If",
-					"Num_Conditional", "Num_Switch", "Num_Var_Ac", "Num_Type_Ac", "Num_Field_Ac", "Num_Assign",
-					"Num_Typed_Ele", "Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Field_Access",
-					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Package").withSkipHeaderRecord();
+			format = CSVFormat.DEFAULT
+					.withHeader("Name_Ext_Mtd", "Con_LOC", "CON_LOCAL", "CON_LITERAL", "CON_INVOCATION", "CON_IF",
+							"CON_CONDITIONAL", "CON_SWITCH", "CON_VAR_ACC", "CON_TYPE_ACC", "CON_FIELD_ACC",
+							"CON_ASSERT", "CON_ASSIGN", "CON_TYPED_ELE", "CON_PACKAGE", "LOC_Extracted_Method",
+							"Num_Variable", "Num_local", "Num_Literal", "Num_Invocation", "Num_If", "Num_Conditional",
+							"Num_Switch", "Num_Var_Ac", "Num_Type_Ac", "Num_Field_Ac", "Num_Assign", "Num_Typed_Ele",
+							"Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Variable_Access2",
+							"Ratio_Field_Access", "Ratio_Field_Access2", "Ratio_Type_Access", "Ratio_Type_Access2",
+							"Ratio_Typed_Ele", "Ratio_Typed_Ele2", "Ratio_Package", "Ratio_Package2", "Coh_Pacakge")
+					.withSkipHeaderRecord();
 		} else {
-			format = CSVFormat.DEFAULT.withHeader("Src_LOC", "Src_Num_local", "Src_Num_Literal", "Src_Num_Invocation",
-					"Src_Num_If", "Src_Num_Conditional", "Src_Num_Switch", "Src_Num_Var_Ac", "Src_Num_Type_Ac",
-					"Src_Num_Field_Ac", "Src_Num_Assert", "Src_Num_Assign", "Src_Num_Typed_Ele", "Src_Num_Package",
-					"LOC_Extracted_Method", "Num_Variable", "Num_local", "Num_Literal", "Num_Invocation", "Num_If",
-					"Num_Conditional", "Num_Switch", "Num_Var_Ac", "Num_Type_Ac", "Num_Field_Ac", "Num_Assign",
-					"Num_Typed_Ele", "Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Field_Access",
-					"Ratio_Type_Access", "Ratio_Typed_Ele", "Ratio_Package");
+			format = CSVFormat.DEFAULT.withHeader("Name_Ext_Mtd", "Con_LOC", "CON_LOCAL", "CON_LITERAL",
+					"CON_INVOCATION", "CON_IF", "CON_CONDITIONAL", "CON_SWITCH", "CON_VAR_ACC", "CON_TYPE_ACC",
+					"CON_FIELD_ACC", "CON_ASSERT", "CON_ASSIGN", "CON_TYPED_ELE", "CON_PACKAGE", "LOC_Extracted_Method",
+					"Num_Variable", "Num_local", "Num_Literal", "Num_Invocation", "Num_If", "Num_Conditional",
+					"Num_Switch", "Num_Var_Ac", "Num_Type_Ac", "Num_Field_Ac", "Num_Assign", "Num_Typed_Ele",
+					"Num_Package", "ratio_LOC", "Ratio_Variable_Access", "Ratio_Variable_Access2", "Ratio_Field_Access",
+					"Ratio_Field_Access2", "Ratio_Type_Access", "Ratio_Type_Access2", "Ratio_Typed_Ele",
+					"Ratio_Typed_Ele2", "Ratio_Package", "Ratio_Package2", "Coh_Pacakge");
 		}
-		try (Writer out = new FileWriter("con_neg.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
-			System.out.println("--------------source method----------------" + sourceMethod.size());
-			for (int w = 0; w < 1; w++) {
-
-				// get the body of source method: blk
-				CtBlock blk = null;
-				if (sourceMethod.get(w) instanceof CtMethod) {
-					CtMethod m = (CtMethod) sourceMethod.get(w);
-					blk = m.getBody();
-				} else if (sourceMethod.get(w) instanceof CtConstructor) {
-					CtConstructor constr = (CtConstructor) sourceMethod.get(w);
-					blk = constr.getBody();
-				}
-
-				// 生成负例
-				// 初始化一个空cblk
-				// System.out.println("should be empty:" + cblk.toString());
-
-				// 根据source method(blk)随机生成statement lists作为cblk
-				// cblk = getRandomStat(blk);
-				List<CtBlock> exhau_candi = getAllCandi(blk);
-				File candidates = new File("candidates");
-				candidates.createNewFile();
-				FileWriter fileWriter2 = new FileWriter(candidates);
-				for (int kl = 0; kl < exhau_candi.size(); kl++) {
-					deleted = exhau_candi.get(kl);
-					CtBlock cblk = exhau_candi.get(kl);
-					System.out.println("hel: " + kl);
-					fileWriter2.write("-----------------------candidate" + kl + "---------------------" + "\n" + "\n"
-							+ deleted.toString() + "\n" + "\n");
-					int start = cblk.getStatement(0).getPosition().getLine();
-					int getEndLine = cblk.getLastStatement().getPosition().getEndLine();
-					fileWriter2.write("getStartLine: " + start + "\n" + "\n");
-					fileWriter2.write("getStartColumn: " + 0 + "\n" + "\n");
-					fileWriter2.write("getEndLine: " + (getEndLine + 1) + "\n" + "\n");
-					fileWriter2.write("getEndColumn: " + 0 + "\n" + "\n");
-
-					// get the context
-					// F1 metrics (context)
-					LOC_Extracted_Method = getEndLine - start;
-					int LOC_Src = getLOC(blk);
-					int Src_LOC = LOC_Src - LOC_Extracted_Method;
-					if (Src_LOC < 0) {
-						Src_LOC = 0;
-					}
-					int Src_Num_local = minusList(blk.getElements(new TypeFilter(CtLocalVariable.class)),
-							deleted.getElements(new TypeFilter(CtLocalVariable.class))).size();
-					int Src_Num_Literal = minusList(blk.getElements(new TypeFilter(CtLiteral.class)),
-							deleted.getElements(new TypeFilter(CtLiteral.class))).size();
-					if (Src_Num_Literal > 0) {
-						Src_Num_Literal = 1;
-					}
-					int Src_Num_Assert = minusList(blk.getElements(new TypeFilter(CtAssert.class)),
-							deleted.getElements(new TypeFilter(CtAssert.class))).size();
-					int Src_Num_Com = minusList(blk.getElements(new TypeFilter(CtComment.class)),
-							deleted.getElements(new TypeFilter(CtComment.class))).size();
-					int Src_Num_Invocation = minusList(blk.getElements(new TypeFilter(CtInvocation.class)),
-							deleted.getElements(new TypeFilter(CtInvocation.class))).size();
-					int Src_Num_Executable = minusList(blk.getElements(new TypeFilter(CtExecutable.class)),
-							deleted.getElements(new TypeFilter(CtExecutable.class))).size();
-					int Src_Num_ExeRefExp = minusList(
-							blk.getElements(new TypeFilter(CtExecutableReferenceExpression.class)),
-							deleted.getElements(new TypeFilter(CtExecutableReferenceExpression.class))).size();
-					int Src_Num_If = minusList(blk.getElements(new TypeFilter(CtIf.class)),
-							deleted.getElements(new TypeFilter(CtIf.class))).size();
-					int Src_Num_Conditional = minusList(blk.getElements(new TypeFilter(CtConditional.class)),
-							deleted.getElements(new TypeFilter(CtConditional.class))).size();
-					int Src_Num_Switch = minusList(blk.getElements(new TypeFilter(CtSwitch.class)),
-							deleted.getElements(new TypeFilter(CtSwitch.class))).size();
-					int Src_Num_Var_Ac = minusList(blk.getElements(new TypeFilter(CtVariableAccess.class)),
-							deleted.getElements(new TypeFilter(CtVariableAccess.class))).size();
-					int Src_Num_Type_Ac = minusList(blk.getElements(new TypeFilter(CtTypeAccess.class)),
-							deleted.getElements(new TypeFilter(CtTypeAccess.class))).size();
-					int Src_Num_Field_Ac = minusList(blk.getElements(new TypeFilter(CtFieldAccess.class)),
-							deleted.getElements(new TypeFilter(CtFieldAccess.class))).size();
-					int Src_Num_Assign = minusList(blk.getElements(new TypeFilter(CtAssignment.class)),
-							deleted.getElements(new TypeFilter(CtAssignment.class))).size();
-					int Src_Num_Typed_Ele = minusList(blk.getElements(new TypeFilter(CtTypedElement.class)),
-							deleted.getElements(new TypeFilter(CtTypedElement.class))).size();
-					int Src_Num_Package = minusList(blk.getElements(new TypeFilter(CtPackageReferenceImpl.class)),
-							deleted.getElements(new TypeFilter(CtPackageReferenceImpl.class))).size();
-					double ratio_LOC = 0;
-					// F2 metrics
-					if (blk.getStatements().size() > 0) {
-						ratio_LOC = LOC_Extracted_Method / (double) blk.getStatements().size();
-					}
-					// variable
-					Num_Variable = deleted.getElements(new TypeFilter(CtVariable.class)).size();
-					Num_local = deleted.getElements(new TypeFilter(CtLocalVariable.class)).size();
-					// Literal
-					Num_Literal = deleted.getElements(new TypeFilter(CtLiteral.class)).size();
-					if (Num_Literal > 0) {
-						Num_Literal = 1;
-					}
-					// Invocation
-					Num_Invocation = deleted.getElements(new TypeFilter(CtInvocation.class)).size();
-					// Structure
-					Num_If = deleted.getElements(new TypeFilter(CtIf.class)).size();
-					Num_Conditional = deleted.getElements(new TypeFilter(CtConditional.class)).size();
-					Num_Switch = deleted.getElements(new TypeFilter(CtSwitch.class)).size();
-					// Access
-					Num_Var_Ac = deleted.getElements(new TypeFilter(CtVariableAccess.class)).size();
-					Num_Type_Ac = deleted.getElements(new TypeFilter(CtTypeAccess.class)).size();
-					Num_Field_Ac = deleted.getElements(new TypeFilter(CtFieldAccess.class)).size();
-					Num_Assign = deleted.getElements(new TypeFilter(CtAssignment.class)).size();
-
-					// F3 the ratio of frequency of variable access in the deleted
-					// part to that in src
-					delVarAcc = new ArrayList<CtVariableAccess>(
-							deleted.getElements(new TypeFilter(CtVariableAccess.class)));
-					srcVarAcc = new ArrayList<CtVariableAccess>(
-							blk.getElements(new TypeFilter(CtVariableAccess.class)));
-					System.out.println("Variable Access that almost only used in the deleted part is: ");
-					double Ratio_Variable_Access = ratio_u(delVarAcc, srcVarAcc, variable_access_most_used);
-
-					// F3 the ratio of frequency of field access in the deleted part
-					// to that in src
-					delFieldAcc = new ArrayList<CtFieldAccess>(
-							deleted.getElements(new TypeFilter(CtFieldAccess.class)));
-					srcFieldAcc = new ArrayList<CtFieldAccess>(blk.getElements(new TypeFilter(CtFieldAccess.class)));
-					System.out.println("Field Access that almost only used in the deleted part is: ");
-					double Ratio_Field_Access = ratio_u(delFieldAcc, srcFieldAcc, field_access_most_used);
-
-					// F3 the ratio of frequency of invocation in the deleted part
-					// to that in src
-					delInvo = new ArrayList<CtInvocation>(deleted.getElements(new TypeFilter(CtInvocation.class)));
-					srcInvo = new ArrayList<CtInvocation>(blk.getElements(new TypeFilter(CtInvocation.class)));
-					System.out.println("Invocation that almost only used in the deleted part is: ");
-					double Ratio_Invocation = ratio_u(delInvo, srcInvo, invocation_most_used);
-
-					// F3 the ratio of frequency of type access in the deleted part
-					// to that in src
-					delTypeAcc = new ArrayList<CtTypeAccess>(deleted.getElements(new TypeFilter(CtTypeAccess.class)));
-					srcTypeAcc = new ArrayList<CtTypeAccess>(blk.getElements(new TypeFilter(CtTypeAccess.class)));
-					System.out.println("Type Access that almost only used in the deleted part is: ");
-					double Ratio_Type_Access = ratio_u(delTypeAcc, srcTypeAcc, type_access_most_used);
-
-					// F3 the ratio of frequency of typed element in the deleted
-					// part to that in src
-					delTypedEle = new ArrayList<CtTypedElement>(
-							deleted.getElements(new TypeFilter(CtTypedElement.class)));
-					srcTypedEle = new ArrayList<CtTypedElement>(blk.getElements(new TypeFilter(CtTypedElement.class)));
-					System.out.println("Typed element that almost only used in the deleted part is: ");
-					int Num_Typed_Ele = delTypedEle.size();
-					double Ratio_Typed_Ele = ratio_u(delTypedEle, srcTypedEle, typed_ele_most_used);
-
-					// F3 the ratio of frequency of packages in the deleted part to
-					// that in src
-					List<CtPackageReferenceImpl> delPackage = new ArrayList<CtPackageReferenceImpl>(
-							deleted.getElements(new TypeFilter(CtPackageReferenceImpl.class)));
-					List<CtPackageReferenceImpl> srcPackage = new ArrayList<CtPackageReferenceImpl>(
-							blk.getElements(new TypeFilter(CtPackageReferenceImpl.class)));
-					int Num_Package = delPackage.size();
-					System.out.println("Package that almost only used in the deleted part is: ");
-					double Ratio_Package = ratio(delPackage, srcPackage, package_most_used);
-					// Print
-					if (Src_LOC >= 0) {
-						printer.printRecord(Src_LOC, Src_Num_local, Src_Num_Literal, Src_Num_Invocation, Src_Num_If,
-								Src_Num_Conditional, Src_Num_Switch, Src_Num_Var_Ac, Src_Num_Type_Ac, Src_Num_Field_Ac,
-								Src_Num_Assert, Src_Num_Assign, Src_Num_Typed_Ele, Src_Num_Package,
-								LOC_Extracted_Method, Num_Variable, Num_local, Num_Literal, Num_Invocation, Num_If,
-								Num_Conditional, Num_Switch, Num_Var_Ac, Num_Type_Ac, Num_Field_Ac, Num_Assign,
-								Num_Typed_Ele, Num_Package, ratio_LOC, Ratio_Variable_Access, Ratio_Field_Access,
-								Ratio_Type_Access, Ratio_Typed_Ele, Ratio_Package);
-						printer.flush();
-					}
-				}
-				fileWriter2.close();
+		try (Writer out = new FileWriter("candidates404.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
+			CtBlock blk = null;
+			if (src_Method instanceof CtMethod) {
+				CtMethod m = (CtMethod) src_Method;
+				blk = m.getBody();
+			} else if (src_Method instanceof CtConstructor) {
+				CtConstructor constr = (CtConstructor) src_Method;
+				blk = constr.getBody();
 			}
+			System.out.println("source method: " + blk.toString());
+			// 生成负例
+			// 初始化一个空cblk
+			// System.out.println("should be empty:" + cblk.toString());
+
+			// 根据source method(blk)随机生成statement lists作为cblk
+			// cblk = getRandomStat(blk);
+			List<CtBlock> exhau_candi = getAllCandi(blk);
+			System.out.println("exhau_candi: " + exhau_candi.size());
+			File candidates = new File("candidates");
+			candidates.createNewFile();
+			FileWriter fileWriter2 = new FileWriter(candidates);
+			for (int kl = 0; kl < exhau_candi.size(); kl++) {
+				deleted = exhau_candi.get(kl);
+				CtBlock cblk = exhau_candi.get(kl);
+				fileWriter2.write("-----------------------candidate" + kl + "---------------------" + "\n" + "\n"
+						+ deleted.toString() + "\n" + "\n");
+				int start = cblk.getStatement(0).getPosition().getLine();
+				int getEndLine = cblk.getLastStatement().getPosition().getEndLine();
+				fileWriter2.write("getStartLine: " + start + "\n" + "\n");
+				fileWriter2.write("getStartColumn: " + 0 + "\n" + "\n");
+				fileWriter2.write("getEndLine: " + (getEndLine + 1) + "\n" + "\n");
+				fileWriter2.write("getEndColumn: " + 0 + "\n" + "\n");
+
+				// get the context
+				// F1 metrics (context)
+				LOC_Extracted_Method = getLOC(cblk);
+				int LOC_Src = getLOC(blk);
+				int Con_LOC = LOC_Src - LOC_Extracted_Method;
+				if (Con_LOC < 0) {
+					Con_LOC = 0;
+				}
+				int CON_LOCAL = minusList(blk.getElements(new TypeFilter(CtLocalVariable.class)),
+						deleted.getElements(new TypeFilter(CtLocalVariable.class))).size();
+				List<CtLiteral> con_literal = minusList(blk.getElements(new TypeFilter(CtLiteral.class)),
+						deleted.getElements(new TypeFilter(CtLiteral.class)));
+				con_literal = filterNull(con_literal);
+				con_literal = filterNum(con_literal);
+				int CON_LITERAL = con_literal.size() > 0 ? 1 : 0;
+				int CON_ASSERT = minusList(blk.getElements(new TypeFilter(CtAssert.class)),
+						deleted.getElements(new TypeFilter(CtAssert.class))).size();
+				int CON_INVOCATION = minusList(blk.getElements(new TypeFilter(CtInvocation.class)),
+						deleted.getElements(new TypeFilter(CtInvocation.class))).size();
+				int CON_IF = minusList(blk.getElements(new TypeFilter(CtIf.class)),
+						deleted.getElements(new TypeFilter(CtIf.class))).size();
+				int CON_CONDITIONAL = minusList(blk.getElements(new TypeFilter(CtConditional.class)),
+						deleted.getElements(new TypeFilter(CtConditional.class))).size();
+				int CON_SWITCH = minusList(blk.getElements(new TypeFilter(CtSwitch.class)),
+						deleted.getElements(new TypeFilter(CtSwitch.class))).size();
+				int CON_VAR_ACC = minusList(blk.getElements(new TypeFilter(CtVariableAccess.class)),
+						deleted.getElements(new TypeFilter(CtVariableAccess.class))).size();
+				int CON_TYPE_ACC = minusList(blk.getElements(new TypeFilter(CtTypeAccess.class)),
+						deleted.getElements(new TypeFilter(CtTypeAccess.class))).size();
+				int CON_FIELD_ACC = minusList(blk.getElements(new TypeFilter(CtFieldAccess.class)),
+						deleted.getElements(new TypeFilter(CtFieldAccess.class))).size();
+				int CON_ASSIGN = minusList(blk.getElements(new TypeFilter(CtAssignment.class)),
+						deleted.getElements(new TypeFilter(CtAssignment.class))).size();
+				int CON_TYPED_ELE = minusList(blk.getElements(new TypeFilter(CtTypedElement.class)),
+						deleted.getElements(new TypeFilter(CtTypedElement.class))).size();
+				int CON_PACKAGE = minusList(blk.getElements(new TypeFilter(CtPackageReferenceImpl.class)),
+						deleted.getElements(new TypeFilter(CtPackageReferenceImpl.class))).size();
+				double ratio_LOC = 0;
+				double[] temp_result = new double[2];
+				temp_result[0] = temp_result[1] = 0;
+				// F2 metrics
+				if (LOC_Src > 0) {
+					ratio_LOC = LOC_Extracted_Method / (double) LOC_Src;
+				}
+				// variable
+				Num_Variable = deleted.getElements(new TypeFilter(CtVariable.class)).size();
+				Num_local = deleted.getElements(new TypeFilter(CtLocalVariable.class)).size();
+				// Literal
+				Num_Literal = deleted.getElements(new TypeFilter(CtLiteral.class)).size();
+				if (Num_Literal > 0) {
+					Num_Literal = 1;
+				}
+				// Invocation
+				Num_Invocation = deleted.getElements(new TypeFilter(CtInvocation.class)).size();
+				// Structure
+				Num_If = deleted.getElements(new TypeFilter(CtIf.class)).size();
+				Num_Conditional = deleted.getElements(new TypeFilter(CtConditional.class)).size();
+				Num_Switch = deleted.getElements(new TypeFilter(CtSwitch.class)).size();
+				// Access
+				Num_Var_Ac = deleted.getElements(new TypeFilter(CtVariableAccess.class)).size();
+				Num_Type_Ac = deleted.getElements(new TypeFilter(CtTypeAccess.class)).size();
+				Num_Field_Ac = deleted.getElements(new TypeFilter(CtFieldAccess.class)).size();
+				Num_Assign = deleted.getElements(new TypeFilter(CtAssignment.class)).size();
+
+				// F3 the ratio of frequency of variable access in the deleted
+				// part to that in src
+				delVarAcc = new ArrayList<CtVariableAccess>(
+						deleted.getElements(new TypeFilter(CtVariableAccess.class)));
+				srcVarAcc = new ArrayList<CtVariableAccess>(blk.getElements(new TypeFilter(CtVariableAccess.class)));
+				System.out.println("Variable Access that almost only used in the deleted part is: ");
+				double Ratio_Variable_Access = ratio_u(temp_result, delVarAcc, srcVarAcc, variable_access_most_used);
+				double Ratio_Variable_Access2 = temp_result[1];
+
+				// F3 the ratio of frequency of field access in the deleted part
+				// to that in src
+				delFieldAcc = new ArrayList<CtFieldAccess>(deleted.getElements(new TypeFilter(CtFieldAccess.class)));
+				srcFieldAcc = new ArrayList<CtFieldAccess>(blk.getElements(new TypeFilter(CtFieldAccess.class)));
+				System.out.println("Field Access that almost only used in the deleted part is: ");
+				double Ratio_Field_Access = ratio_u(temp_result, delFieldAcc, srcFieldAcc, field_access_most_used);
+				double Ratio_Field_Access2 = temp_result[1];
+
+				// F3 the ratio of frequency of invocation in the deleted part
+				// to that in src
+				if (LOC_Src > 0) {
+					ratio_LOC = LOC_Extracted_Method / (double) LOC_Src;
+				}
+
+				delInvo = new ArrayList<CtInvocation>(deleted.getElements(new TypeFilter(CtInvocation.class)));
+				srcInvo = new ArrayList<CtInvocation>(blk.getElements(new TypeFilter(CtInvocation.class)));
+				System.out.println("Invocation that almost only used in the deleted part is: ");
+				double Ratio_Invocation = ratio_u(temp_result, delInvo, srcInvo, invocation_most_used);
+				double Ratio_Invocation2 = temp_result[1];
+
+				// F3 the ratio of frequency of type access in the deleted part
+				// to that in src
+				delTypeAcc = new ArrayList<CtTypeAccess>(deleted.getElements(new TypeFilter(CtTypeAccess.class)));
+				srcTypeAcc = new ArrayList<CtTypeAccess>(blk.getElements(new TypeFilter(CtTypeAccess.class)));
+				System.out.println("Type Access that almost only used in the deleted part is: ");
+				double Ratio_Type_Access = ratio_u(temp_result, delTypeAcc, srcTypeAcc, type_access_most_used);
+				double Ratio_Type_Access2 = temp_result[1];
+
+				// F3 the ratio of frequency of typed element in the deleted
+				// part to that in src
+				delTypedEle = new ArrayList<CtTypedElement>(deleted.getElements(new TypeFilter(CtTypedElement.class)));
+				srcTypedEle = new ArrayList<CtTypedElement>(blk.getElements(new TypeFilter(CtTypedElement.class)));
+				System.out.println("Typed element that almost only used in the deleted part is: ");
+				int Num_Typed_Ele = delTypedEle.size();
+				double Ratio_Typed_Ele = ratio_u(temp_result, delTypedEle, srcTypedEle, typed_ele_most_used);
+				double Ratio_Typed_Ele2 = temp_result[1];
+
+				// F3 the ratio of frequency of packages in the deleted part to
+				// that in src
+				List<CtPackageReferenceImpl> delPackage = new ArrayList<CtPackageReferenceImpl>(
+						deleted.getElements(new TypeFilter(CtPackageReferenceImpl.class)));
+				List<CtPackageReferenceImpl> srcPackage = new ArrayList<CtPackageReferenceImpl>(
+						blk.getElements(new TypeFilter(CtPackageReferenceImpl.class)));
+				int Num_Package = delPackage.size();
+				System.out.println("Package that almost only used in the deleted part is: ");
+				double Ratio_Package = ratio(temp_result, delPackage, srcPackage, package_most_used);
+				double Ratio_Package2 = temp_result[1];
+
+				// Cohesion of Package
+				double Coh_Pacakge = 0;
+				if (LOC_Extracted_Method > 0) {
+					Coh_Pacakge = Ratio_Package / (double) LOC_Extracted_Method;
+				}
+
+				// Print
+				if (LOC_Src >= 0) {
+					printer.printRecord(Name_Ext_Mtd, Con_LOC, CON_LOCAL, CON_LITERAL, CON_INVOCATION, CON_IF,
+							CON_CONDITIONAL, CON_SWITCH, CON_VAR_ACC, CON_TYPE_ACC, CON_FIELD_ACC, CON_ASSERT,
+							CON_ASSIGN, CON_TYPED_ELE, CON_PACKAGE, LOC_Extracted_Method, Num_Variable, Num_local,
+							Num_Literal, Num_Invocation, Num_If, Num_Conditional, Num_Switch, Num_Var_Ac, Num_Type_Ac,
+							Num_Field_Ac, Num_Assign, Num_Typed_Ele, Num_Package, ratio_LOC, Ratio_Variable_Access,
+							Ratio_Variable_Access2, Ratio_Field_Access, Ratio_Field_Access2, Ratio_Type_Access,
+							Ratio_Type_Access2, Ratio_Typed_Ele, Ratio_Typed_Ele2, Ratio_Package, Ratio_Package2,
+							Coh_Pacakge);
+					printer.flush();
+				}
+			}
+			fileWriter2.close();
 			printer.close();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -735,16 +811,14 @@ public class DiffImpl implements Diff {
 
 		// 获取全部的blocks
 		List<CtBlock> all_blocks = blk.getElements(new TypeFilter(CtBlock.class));
-		System.out.println("number of blocks: " + all_blocks.size());
-
 		// 随机获取一个block
 		int random = genRandom(0, all_blocks.size() - 1);
 		CtBlock tblk = all_blocks.get(random);
-
 		// 随机获取相邻的语句
 		int size = tblk.getStatements().size();
 		int start = genRandom(0, size - 1);
 		int end = genRandom(start, size - 1);
+		System.out.println("chosen start: " + start + " chosen end: " + end);
 		for (int i = start; i <= end; i++) {
 			cblk.addStatement(tblk.getStatement(i));
 		}
@@ -752,32 +826,8 @@ public class DiffImpl implements Diff {
 				|| cblk.toString().contains("continue;"))) {
 			getRandomStat(blk);
 		}
-		System.out.println("should not be empty: " + cblk.toString());
+		// System.out.println("should not be empty: " + cblk.toString());
 		return cblk;
-	}
-
-	private List<CtBlock> getAllCandi(CtBlock blk) {
-		// 随机选一个block，并随机选择其中的几个相邻的语句
-		// 生成一个空的block lists
-		List<CtBlock> candidates = new ArrayList<CtBlock>();
-
-		// 获取全部的blocks
-		List<CtBlock> all_blocks = blk.getElements(new TypeFilter(CtBlock.class));
-		System.out.println("number of blocks: " + all_blocks.size());
-		for (int j = 0; j < all_blocks.size(); j++) {
-			CtBlock temp = all_blocks.get(j);
-			int blk_size = temp.getStatements().size();
-			for (int z = 0; z < blk_size; z++) {
-				for (int y = z; y < blk_size; y++) {
-					CtBlock cblk = newBlock(blk);
-					for (int q = z; q <= y; q++) {
-						cblk.addStatement(temp.getStatement(q));
-					}
-					candidates.add(cblk);
-				}
-			}
-		}
-		return candidates;
 	}
 
 	private CtBlock newBlock(CtBlock blk) {
@@ -814,12 +864,18 @@ public class DiffImpl implements Diff {
 		return (rand.nextInt(MAX - MIN + 1) + MIN);
 	}
 
-	private double ratio(List<CtPackageReferenceImpl> delPackage, List<CtPackageReferenceImpl> srcPackage,
-			CtPackageReferenceImpl pkg) {
-		// 计算cohesion
+	private double ratio(double[] ratio, List<CtPackageReferenceImpl> delPackage,
+			List<CtPackageReferenceImpl> srcPackage, CtPackageReferenceImpl pkg) {
+		// TODO Auto-generated method stub
 		List<CtPackageReferenceImpl> parPackage = new ArrayList<CtPackageReferenceImpl>();
-		for (int p = 0; p < extracted_Method.getParameters().size(); p++) {
-			CtParameter par = (CtParameter) extracted_Method.getParameters().get(p);
+		List<CtParameter> params = new ArrayList<CtParameter>();
+		if (extracted_Method instanceof CtMethod) {
+			params = ((CtMethod) extracted_Method).getParameters();
+		} else if (extracted_Method instanceof CtConstructor) {
+			params = ((CtConstructor) extracted_Method).getParameters();
+		}
+		for (int p = 0; p < params.size(); p++) {
+			CtParameter par = params.get(p);
 			List<CtPackageReferenceImpl> ttt = par.getType().getElements(new TypeFilter(CtPackageReferenceImpl.class));
 			for (int k = 0; k < ttt.size(); k++) {
 				parPackage.add(ttt.get(k));
@@ -829,11 +885,10 @@ public class DiffImpl implements Diff {
 		for (int l = 0; l < delPackage2.size(); l++) {
 			CtPackageReferenceImpl tem = delPackage2.get(l);
 			if (parPackage.contains(tem)) {
-				delPackage2.remove(tem);
+				delPackage2.remove(delPackage2.indexOf(tem));
 				l--;
 			}
 		}
-		System.out.println("------CtDelPackageReferenceImpl---------++" + delPackage2);
 		int num1, num2;
 		CtPackageReferenceImpl temp;
 		int size = delPackage2.size();
@@ -849,29 +904,32 @@ public class DiffImpl implements Diff {
 			}
 		}
 		double result = 0;
+		double result2 = 0;
 		int index = -1;
 		for (int j = 0; j < size; j++) {
 			if (all_ratios[j] > result) {
 				index = j;
+				result2 = result;
 				result = all_ratios[j];
 			}
 		}
 		if (index == -1) {
 			System.out.println("No package used in the code");
 		} else {
-			System.out.println(" " + delPackage2.get(index));
+			System.out.println("the most used package: " + delPackage2.get(index));
 			pkg = delPackage2.get(index);
 		}
 		if (result > 1) {
 			result = 1;
 		}
+		ratio[0] = result;
+		ratio[1] = result2;
 		return result;
 	}
 
-	private <T> double ratio_u(List<T> delPackage, List<T> srcPackage, T pkg) {
+	private <T> double ratio_u(double[] ratio, List<T> delPackage, List<T> srcPackage, T pkg) {
 		// TODO Auto-generated method stub
 		List<T> delPackage2 = getNewList(delPackage);
-		System.out.println("------CtDel***Impl---------++" + delPackage2);
 		int num1, num2;
 		T temp;
 		int size = delPackage2.size();
@@ -887,22 +945,26 @@ public class DiffImpl implements Diff {
 			}
 		}
 		double result = 0;
+		double result2 = 0;
 		int index = -1;
 		for (int j = 0; j < size; j++) {
 			if (all_ratios[j] > result) {
 				index = j;
+				result2 = result;
 				result = all_ratios[j];
 			}
 		}
 		if (index == -1) {
 			System.out.println("Nothing used in the code");
 		} else {
-			System.out.println(" " + delPackage2.get(index));
+			System.out.println("the most used element: " + delPackage2.get(index));
 			pkg = delPackage2.get(index);
 		}
 		if (result > 1) {
 			result = 1;
 		}
+		ratio[0] = result;
+		ratio[1] = result2;
 		return result;
 	}
 
@@ -958,7 +1020,6 @@ public class DiffImpl implements Diff {
 						CtMethod te2 = (CtMethod) element;
 						if (te2.getSimpleName().toString().equals(Name_Src_Mtd)
 								&& element.toString().contains(Name_Ext_Mtd)) {
-							callMethod.add(te2);
 						} else if (te2.getSimpleName().toString().equals(Name_Ext_Mtd) && flagtemp == false) {
 							flagtemp = true;
 							System.out.println("--------------------A new method is inserted!");
@@ -975,7 +1036,6 @@ public class DiffImpl implements Diff {
 							System.out.println("+++++++++++");
 							CtMethod m = (CtMethod) callIt;
 							if (m.getSimpleName().toString().equals(Name_Src_Mtd)) {
-								callMethod.add((CtMethod) callIt);
 							}
 						} else if (callIt instanceof CtConstructor) {
 							CtConstructor m = (CtConstructor) callIt;
@@ -986,7 +1046,6 @@ public class DiffImpl implements Diff {
 							System.out.println("class name:" + class_name.getSimpleName());
 							if (class_name.getSimpleName().equals(Name_Src_Mtd)) {
 								System.out.println("extract from constructor!");
-								callMethod.add(m);
 							}
 						}
 					}
@@ -1002,7 +1061,6 @@ public class DiffImpl implements Diff {
 							CtMethod src_temp = (CtMethod) callIt;
 							if (src_temp.getSimpleName().toString().equals(Name_Src_Mtd)) {
 								deleteStuff.add(element);
-								sourceMethod.add(src_temp);
 							}
 						} else if (callIt instanceof CtConstructor) {
 							CtConstructor m = (CtConstructor) callIt;
@@ -1014,7 +1072,6 @@ public class DiffImpl implements Diff {
 							if (class_name.getSimpleName().equals(Name_Src_Mtd)) {
 								System.out.println("extract from constructor!");
 								deleteStuff.add(element);
-								sourceMethod.add(m);
 							}
 						}
 					}
@@ -1032,7 +1089,6 @@ public class DiffImpl implements Diff {
 								CtMethod temp_method = (CtMethod) callIt;
 								if (temp_method.getSimpleName().toString().equals(Name_Src_Mtd)) {
 									deleteStuff.add(element);
-									sourceMethod.add(temp_method);
 								}
 							} else if (callIt instanceof CtConstructor) {
 								CtConstructor m = (CtConstructor) callIt;
@@ -1044,7 +1100,6 @@ public class DiffImpl implements Diff {
 								if (class_name.getSimpleName().equals(Name_Src_Mtd)) {
 									System.out.println("extract from constructor!");
 									deleteStuff.add(element);
-									sourceMethod.add(m);
 								}
 							}
 						}
@@ -1068,7 +1123,6 @@ public class DiffImpl implements Diff {
 					if (callIt instanceof CtMethod) {
 						CtMethod temp_method = (CtMethod) callIt;
 						if (temp_method.getSimpleName().toString().equals(Name_Src_Mtd)) {
-							sourceMethod.add(temp_method);
 						}
 					} else if (callIt instanceof CtConstructor) {
 						CtConstructor m = (CtConstructor) callIt;
@@ -1080,7 +1134,6 @@ public class DiffImpl implements Diff {
 						if (class_name.getSimpleName().equals(Name_Src_Mtd)) {
 							System.out.println("extract from constructor!");
 							deleteStuff.add(element);
-							sourceMethod.add(m);
 						}
 					}
 					CtElement elementDest = (CtElement) action.getNode()
@@ -1093,7 +1146,6 @@ public class DiffImpl implements Diff {
 							System.out.println("--------------------A new method is updated !");
 						} else if (temp_dest.getSimpleName().equals(Name_Src_Mtd)
 								&& temp_dest.toString().contains(Name_Ext_Mtd)) {
-							callMethod.add(temp_dest);
 						}
 					} else if (!nodeType.equalsIgnoreCase("Constructor")
 							&& elementDest.toString().contains(Name_Ext_Mtd)) {
@@ -1103,7 +1155,6 @@ public class DiffImpl implements Diff {
 							callIt1 = callIt1.getParent();
 						}
 						if (callIt1 instanceof CtMethod) {
-							callMethod.add((CtMethod) callIt1);
 						} else if (callIt instanceof CtConstructor) {
 							CtConstructor m = (CtConstructor) callIt;
 							while (!(callIt instanceof CtClass)) {
@@ -1113,7 +1164,6 @@ public class DiffImpl implements Diff {
 							System.out.println("class name:" + class_name.getSimpleName());
 							if (class_name.getSimpleName().equals(Name_Src_Mtd)) {
 								System.out.println("extract from constructor!");
-								callMethod.add(m);
 							}
 						}
 					}
