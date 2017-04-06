@@ -474,7 +474,7 @@ public class DiffImpl implements Diff {
 	// 	fileWriter.close();
 	// }
 	public void print_before() throws IOException {
-		File file_before = new File("before_method");
+		File file_before = new File("before");
 		file_before.createNewFile();
 		FileWriter fileWriter2 = new FileWriter(file_before);
 		fileWriter2.write("--------------------------Source Methods------------------------------" + "\n" + "\n");
@@ -594,7 +594,7 @@ public class DiffImpl implements Diff {
 
 	public void print_file() {
 		// ---------------------------------------------Print
-		File file = new File("candidates404.csv");
+		File file = new File("csv" + Name_Ext_Mtd + ".csv");
 		CSVFormat format = null;
 		if (file.exists()) {
 			format = CSVFormat.DEFAULT
@@ -617,7 +617,8 @@ public class DiffImpl implements Diff {
 					"Ratio_Field_Access2", "Ratio_Type_Access", "Ratio_Type_Access2", "Ratio_Typed_Ele",
 					"Ratio_Typed_Ele2", "Ratio_Package", "Ratio_Package2", "Coh_Pacakge");
 		}
-		try (Writer out = new FileWriter("candidates404.csv", true); CSVPrinter printer = new CSVPrinter(out, format)) {
+		try (Writer out = new FileWriter("csv" + Name_Ext_Mtd + ".csv", true);
+				CSVPrinter printer = new CSVPrinter(out, format)) {
 			CtBlock blk = null;
 			if (src_Method instanceof CtMethod) {
 				CtMethod m = (CtMethod) src_Method;
@@ -634,8 +635,7 @@ public class DiffImpl implements Diff {
 			// 根据source method(blk)随机生成statement lists作为cblk
 			// cblk = getRandomStat(blk);
 			List<CtBlock> exhau_candi = getAllCandi(blk);
-			System.out.println("exhau_candi: " + exhau_candi.size());
-			File candidates = new File("candidates");
+			File candidates = new File("txt" + Name_Ext_Mtd + ".txt");
 			candidates.createNewFile();
 			FileWriter fileWriter2 = new FileWriter(candidates);
 			for (int kl = 0; kl < exhau_candi.size(); kl++) {
